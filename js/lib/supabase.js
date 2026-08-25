@@ -33,6 +33,22 @@ export const auth = {
     return { data, error };
   },
 
+  // Signup com convite (email + senha + token)
+  async signUpWithInvite(email, password, inviteToken, fullName) {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName || '',
+          invite_token: inviteToken
+        },
+        emailRedirectTo: window.location.origin + '/admin.html'
+      }
+    });
+    return { data, error };
+  },
+
   // Logout
   async signOut() {
     const { error } = await supabase.auth.signOut();
@@ -488,6 +504,107 @@ export const menuApi = {
       },
       error: null
     };
+  }
+};
+
+// ============================================
+// INVITES API (Sistema de Convites)
+// ============================================
+export const invitesApi = {
+  // Criar convite (superadmin)
+  async create(email, storeName, storeSlug) {
+    const { data, error } = await supabase
+      .from('invites')
+      .insert([{
+        email: email.toLowerCase().trim(),
+        store_name: storeName || null,
+        store_slug: storeSlug || null,
+        created_by: (await supabase.auth.getUser()).data.user?.id
+      }])
+      .select()
+      .single();
+    return { data, error };
+  },
+
+  // Listar convites (superadmin)
+  async list() {
+    const { data, error } = await supabase
+      .from('invites')
+      .select('*')
+      .order('created_at', { ascending: false });
+    return { data, error };
+  },
+
+  // Validar token de convite
+  async validate(token) {
+    const { data, error } = await supabase
+      .rpc('validate_invite', { p_token: token });
+    return { data, error };
+  },
+
+  // Revogar convite
+  async revoke(id) {
+    const { data, error } = await supabase
+      .from('invites')
+      .update({ status: 'revoked', updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    return { data, error };
+  },
+
+  // Reenviar convite (atualiza expiração)
+  async resend(id) {
+    const { data, error } = await supabase
+      .from('invites')
+      .update({
+        status: 'pending',
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    return { data, error };
+  },
+
+  // Deletar convite
+  async delete(id) {
+    const { error } = await supabase
+      .from('invites')
+      .delete()
+      .eq('id', id);
+    return { error };
+  }
+};
+
+// ============================================
+// PROFILES API
+// ============================================
+export const profilesApi = {
+  async get(userId) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    return { data, error };
+  },
+
+  async update(userId, updates) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', userId)
+      .select()
+      .single();
+    return { data, error };
+  },
+
+  async isSuperadmin() {
+    const { data, error } = await supabase
+      .rpc('is_superadmin');
+    return { data, error };
   }
 };
 
