@@ -16,6 +16,11 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   }
 });
 
+// Helper para preservar subpath do GitHub Pages (/cardapioonline)
+function getBaseUrlLib() {
+  return window.location.origin + window.location.pathname.replace(/\/admin\.html.*$/, '').replace(/\/index\.html.*$/, '').replace(/\/$/, '');
+}
+
 // Helpers de autenticação
 export const auth = {
   // Login com email/senha
@@ -28,7 +33,7 @@ export const auth = {
   async signInWithMagicLink(email, redirectTo) {
     const { data, error } = await supabase.auth.signInWithOtp({ 
       email, 
-      options: { emailRedirectTo: redirectTo || window.location.origin + '/admin.html' }
+      options: { emailRedirectTo: redirectTo || getBaseUrlLib() + '/admin.html' }
     });
     return { data, error };
   },
@@ -43,7 +48,7 @@ export const auth = {
           full_name: fullName || '',
           invite_token: inviteToken
         },
-        emailRedirectTo: window.location.origin + '/admin.html'
+        emailRedirectTo: getBaseUrlLib() + '/admin.html'
       }
     });
     return { data, error };

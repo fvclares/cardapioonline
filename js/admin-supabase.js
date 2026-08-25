@@ -375,8 +375,12 @@ function showPreview(containerId, url) {
   container.innerHTML = `<img src="${url}" alt="Preview" style="max-width: 180px; max-height: 100px; border-radius: var(--radius-md); border: 1px solid var(--border);" />`;
 }
 
+function getBaseUrl() {
+  // Preserve GitHub Pages subpath (/cardapioonline) if present
+  return window.location.origin + window.location.pathname.replace(/\/admin\.html.*$/, '');
+}
 function updatePublicUrl(slug) {
-  const baseUrl = window.location.origin.replace('/admin.html', '');
+  const baseUrl = getBaseUrl();
   const publicUrl = `${baseUrl}/index.html?store=${slug}`;
   document.getElementById('publicStoreUrl').textContent = publicUrl;
 }
@@ -1075,7 +1079,7 @@ async function renderInvites() {
   container.innerHTML = data.map(invite => {
     const created = new Date(invite.created_at).toLocaleString('pt-BR');
     const expires = new Date(invite.expires_at).toLocaleString('pt-BR');
-    const inviteUrl = `${window.location.origin}/admin.html?invite=${invite.token}`;
+    const inviteUrl = `${getBaseUrl()}/admin.html?invite=${invite.token}`;
 
     return `
       <div class="admin-card" style="margin-bottom: 1rem; padding: 1.2rem; background: var(--bg-card);">
@@ -1168,7 +1172,7 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
   }
 
   // Copia link automaticamente
-  const inviteUrl = `${window.location.origin}/admin.html?invite=${data.token}`;
+  const inviteUrl = `${getBaseUrl()}/admin.html?invite=${data.token}`;
   navigator.clipboard.writeText(inviteUrl).then(() => {
     showToast(`✅ Convite criado! Link copiado para ${email}`, 'success');
   }).catch(() => {
