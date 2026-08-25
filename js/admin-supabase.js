@@ -4,8 +4,8 @@
  * Sistema de Convites (invite-only)
  */
 
-import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi } from './lib/supabase.js?v=8';
-import storage from './state/storage-supabase.js?v=8';
+import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi } from './lib/supabase.js?v=9';
+import storage from './state/storage-supabase.js?v=9';
 
 // Expose para compatibilidade global
 window.supabase = supabase;
@@ -359,11 +359,14 @@ async function loadStoreData() {
   document.getElementById('storeHoursInput').value = store.opening_hours || '';
   document.getElementById('storeDeliveryFeeInput').value = store.default_delivery_fee || 7.00;
   document.getElementById('storeMinOrderInput').value = store.min_order_value || 35.00;
-  document.getElementById('storeLogoInput').value = store.logo_url || '';
-  document.getElementById('storeCoverInput').value = store.cover_url || '';
-
+  document.getElementById('storeLogoCurrentUrl').value = store.logo_url || '';
+  document.getElementById('storeCoverCurrentUrl').value = store.cover_url || '';
+  document.getElementById('storeLogoInput').value = '';
+  document.getElementById('storeCoverInput').value = '';
   if (store.logo_url) showPreview('storeLogoPreview', store.logo_url);
+  else document.getElementById('storeLogoPreview').innerHTML = '';
   if (store.cover_url) showPreview('storeCoverPreview', store.cover_url);
+  else document.getElementById('storeCoverPreview').innerHTML = '';
 
   const isOpen = store.status === 'open';
   const statusInput = document.getElementById('storeStatusInput');
@@ -372,21 +375,31 @@ async function loadStoreData() {
   statusText.textContent = isOpen ? 'Aberto' : 'Fechado';
   statusText.style.color = isOpen ? 'var(--status-open)' : 'var(--status-closed)';
 
-  // Live preview (use once guard to avoid duplicate listeners)
+  // Live preview file (once)
   const logoInput = document.getElementById('storeLogoInput');
   const coverInput = document.getElementById('storeCoverInput');
   if (!logoInput._previewBound) {
     logoInput._previewBound = true;
-    logoInput.addEventListener('input', (e) => {
-      if (e.target.value) showPreview('storeLogoPreview', e.target.value);
-      else document.getElementById('storeLogoPreview').innerHTML = '';
+    logoInput.addEventListener('change', (e) => {
+      const f = e.target.files?.[0];
+      if (f) {
+        if (f.size > 5*1024*1024) { showToast('Logo muito grande (max 5MB)','error'); e.target.value=''; return; }
+        showPreview('storeLogoPreview', URL.createObjectURL(f));
+      } else if (document.getElementById('storeLogoCurrentUrl').value) {
+        showPreview('storeLogoPreview', document.getElementById('storeLogoCurrentUrl').value);
+      } else document.getElementById('storeLogoPreview').innerHTML = '';
     });
   }
   if (!coverInput._previewBound) {
     coverInput._previewBound = true;
-    coverInput.addEventListener('input', (e) => {
-      if (e.target.value) showPreview('storeCoverPreview', e.target.value);
-      else document.getElementById('storeCoverPreview').innerHTML = '';
+    coverInput.addEventListener('change', (e) => {
+      const f = e.target.files?.[0];
+      if (f) {
+        if (f.size > 5*1024*1024) { showToast('Capa muito grande (max 5MB)','error'); e.target.value=''; return; }
+        showPreview('storeCoverPreview', URL.createObjectURL(f));
+      } else if (document.getElementById('storeCoverCurrentUrl').value) {
+        showPreview('storeCoverPreview', document.getElementById('storeCoverCurrentUrl').value);
+      } else document.getElementById('storeCoverPreview').innerHTML = '';
     });
   }
 
@@ -418,6 +431,31 @@ document.getElementById('storeSettingsForm').addEventListener('submit', async (e
   e.preventDefault();
   if (!currentStoreId) return;
 
+  showLoading(true);
+  // Upload logo/cover se houver novo arquivo
+  let logoUrl = document.getElementById('storeLogoCurrentUrl').value;
+  let coverUrl = document.getElementById('storeCoverCurrentUrl').value;
+  const logoFile = document.getElementById('storeLogoInput').files?.[0];
+  const coverFile = document.getElementById('storeCoverInput').files?.[0];
+  try {
+    if (logoFile) {
+      const comp = await compressImage(logoFile, 800, 0.7);
+      const { data, error } = await storageApi.uploadProductImage(currentStoreId, comp, comp.name);
+      if (error) throw error;
+      logoUrl = storageApi.getPublicUrl(data.path);
+    }
+    if (coverFile) {
+      const comp = await compressImage(coverFile, 1200, 0.75);
+      const { data, error } = await storageApi.uploadProductImage(currentStoreId, comp, comp.name);
+      if (error) throw error;
+      coverUrl = storageApi.getPublicUrl(data.path);
+    }
+  } catch (err) {
+    showLoading(false);
+    showToast('Erro imagem: ' + err.message, 'error');
+    return;
+  }
+
   const updates = {
     name: document.getElementById('storeNameInput').value.trim(),
     slug: document.getElementById('storeSlugInput').value.trim().toLowerCase(),
@@ -427,8 +465,8 @@ document.getElementById('storeSettingsForm').addEventListener('submit', async (e
     opening_hours: document.getElementById('storeHoursInput').value.trim(),
     default_delivery_fee: Number(document.getElementById('storeDeliveryFeeInput').value) || 7.00,
     min_order_value: Number(document.getElementById('storeMinOrderInput').value) || 35.00,
-    logo_url: document.getElementById('storeLogoInput').value.trim(),
-    cover_url: document.getElementById('storeCoverInput').value.trim(),
+    logo_url: logoUrl,
+    cover_url: coverUrl,
     status: document.getElementById('storeStatusInput').checked ? 'open' : 'closed'
   };
 

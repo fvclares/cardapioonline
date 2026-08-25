@@ -254,15 +254,17 @@
 
             <div class="form-grid form-grid-2" style="margin-bottom: 1.5rem;">
               <div class="form-group">
-                <label class="form-label">URL da Logo</label>
-                <input type="url" id="storeLogoInput" placeholder="https://..." />
-                <span class="form-help">Use URL raw do GitHub ou Supabase Storage</span>
+                <label class="form-label">Logo da Loja</label>
+                <input type="file" id="storeLogoInput" accept="image/jpeg,image/png,image/webp" />
+                <input type="hidden" id="storeLogoCurrentUrl" />
+                <span class="form-help">JPG/PNG/WEBP até 5MB, 800px</span>
                 <div id="storeLogoPreview" style="margin-top: 0.5rem;"></div>
               </div>
               <div class="form-group">
-                <label class="form-label">URL da Capa</label>
-                <input type="url" id="storeCoverInput" placeholder="https://..." />
-                <span class="form-help">Use URL raw do GitHub ou Supabase Storage</span>
+                <label class="form-label">Capa do Cardápio</label>
+                <input type="file" id="storeCoverInput" accept="image/jpeg,image/png,image/webp" />
+                <input type="hidden" id="storeCoverCurrentUrl" />
+                <span class="form-help">JPG/PNG/WEBP até 5MB, 1200px</span>
                 <div id="storeCoverPreview" style="margin-top: 0.5rem;"></div>
               </div>
             </div>
@@ -695,6 +697,6 @@
   </div>
 
   <!-- Scripts (Module) -->
-  <script type="module" src="js/admin-supabase.js?v=8"></script>
+  <script type="module" src="js/admin-supabase.js?v=9"></script>
 </body>
 </html>
