@@ -3,6 +3,8 @@
  * Multi-tenant SaaS com autenticação Supabase Auth
  */
 
+import { auth, storeApi, categoriesApi, productsApi, addonGroupsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi } from './lib/supabase.js';
+
 // Estado global
 let currentStore = null;
 let currentUser = null;

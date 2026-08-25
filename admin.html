@@ -460,7 +460,6 @@
   <script type="module">
     import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi } from './js/lib/supabase.js';
     import { storage } from './js/state/storage-supabase.js';
-    import { customerService } from './js/services/customer.js';
 
     // Expose para compatibilidade
     window.supabase = supabase;
@@ -473,8 +472,7 @@
     window.ordersApi = ordersApi;
     window.settingsApi = settingsApi;
     window.storageApi = storageApi;
-    window.cs = customerService;
   </script>
-  <script src="js/admin-supabase.js" defer></script>
+  <script type="module" src="js/admin-supabase.js"></script>
 </body>
 </html>
