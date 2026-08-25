@@ -67,10 +67,9 @@ class SupabaseStorageEngine {
       this._dataCache.categories = (categoriesResult.data || []).map(normalizeCategory);
       this._dataCache.products = (productsResult.data || []).map(normalizeProduct);
 
-      // AddonGroups: supabase retorna array; frontend espera {sizes, crusts, extras}
+      // AddonGroups: só mostra opcionais se a loja cadastrou; vazio = sem bordas/extras
       if (!addonsResult.data || addonsResult.data.length === 0) {
-        // Nenhum grupo cadastrado no Supabase -> usa mock padrão (tamanhos/bordas/extras)
-        this._dataCache.addonGroups = window.INITIAL_ADDON_GROUPS ? JSON.parse(JSON.stringify(window.INITIAL_ADDON_GROUPS)) : {};
+        this._dataCache.addonGroups = {};
       } else {
         const mapped = {};
         for (const g of addonsResult.data) {
@@ -92,10 +91,6 @@ class SupabaseStorageEngine {
           mapped[key] = entry;
           mapped[g.id] = entry;
         }
-        // Garante fallback se algum tipo não veio do banco
-        if (!mapped.sizes && window.INITIAL_ADDON_GROUPS?.sizes) mapped.sizes = window.INITIAL_ADDON_GROUPS.sizes;
-        if (!mapped.crusts && window.INITIAL_ADDON_GROUPS?.crusts) mapped.crusts = window.INITIAL_ADDON_GROUPS.crusts;
-        if (!mapped.extras && window.INITIAL_ADDON_GROUPS?.extras) mapped.extras = window.INITIAL_ADDON_GROUPS.extras;
         this._dataCache.addonGroups = mapped;
       }
       this._dataCache.neighborhoods = neighborhoodsResult.data || [];
