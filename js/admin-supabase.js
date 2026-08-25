@@ -268,7 +268,6 @@ async function onAuthSuccess(user) {
     await loadStoreData();
     showAdminLayout(user);
     startOrdersRealtime();
-    showToast(`Bem-vindo, ${user.full_name || user.email}!`, 'success');
     return;
   }
 
