@@ -48,10 +48,14 @@ const whatsappService = {
     if (order.orderType === 'delivery') {
       const addr = order.deliveryAddress;
       lines.push(`🛵 *ENTREGA EM DOMICÍLIO:*`);
-      lines.push(`Rua: ${addr.street}, nº ${addr.number}`);
-      if (addr.complement) lines.push(`Compl: ${addr.complement}`);
-      lines.push(`Bairro: ${addr.neighborhood} - ${addr.city}`);
-      if (addr.reference) lines.push(`Ref: ${addr.reference}`);
+      if (addr && addr.street) {
+        lines.push(`Rua: ${addr.street}, nº ${addr.number}`);
+        if (addr.complement) lines.push(`Compl: ${addr.complement}`);
+        lines.push(`Bairro: ${addr.neighborhood} - ${addr.city}`);
+        if (addr.reference) lines.push(`Ref: ${addr.reference}`);
+      } else {
+        lines.push(`Endereço: não informado (verificar com cliente)`);
+      }
     } else {
       lines.push(`🏪 *RETIRADA NO BALCÃO DA LOJA*`);
     }
