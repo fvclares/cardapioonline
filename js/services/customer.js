@@ -102,3 +102,6 @@ const customerService = {
 };
 
 window.customerService = customerService;
+
+// ES Module export
+export const customerService = customerService;

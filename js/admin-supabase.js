@@ -477,7 +477,7 @@ async function renderProducts() {
 document.getElementById('filterProductCategory').addEventListener('change', renderProducts);
 document.getElementById('filterProductSearch').addEventListener('input', renderProducts);
 
-function openProductModal(prodId = null) {
+async function openProductModal(prodId = null) {
   const titleEl = document.getElementById('productModalTitle');
   const idInput = document.getElementById('prodEditId');
   const nameInput = document.getElementById('prodNameInput');
