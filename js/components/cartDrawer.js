@@ -173,7 +173,7 @@ function setupCartDrawer(onProceedToCheckout) {
           </div>
           ${orderType === 'delivery' ? `
             <div class="order-total-row">
-              <span>Taxa de Entrega (${window.appState.cart.neighborhood?.name || 'Padrão'}):</span>
+              <span>Taxa de Entrega${window.appState.cart.neighborhood?.name ? ` (${window.appState.cart.neighborhood.name})` : ''}:</span>
               <span>${cs ? cs.formatCurrency(deliveryFee) : 'R$ ' + deliveryFee}</span>
             </div>
           ` : `

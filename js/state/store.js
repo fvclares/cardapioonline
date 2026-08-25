@@ -119,12 +119,9 @@ class StoreState {
       }
       this.customer = storageEngine.getCustomerProfile();
       
-      // Default neighborhood
-      if (!this.cart.neighborhood && this.store) {
-        this.cart.neighborhood = this.store.neighborhoods?.[0] || { 
-          name: 'Padrão', 
-          fee: this.store.default_delivery_fee || 7.00 
-        };
+      // Default neighborhood (apenas se loja cadastrou bairros; sem Padrão)
+      if (!this.cart.neighborhood && this.store && this.store.neighborhoods?.[0]) {
+        this.cart.neighborhood = this.store.neighborhoods[0];
       }
       
       this._ready = true;
