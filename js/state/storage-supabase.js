@@ -6,6 +6,24 @@
 
 import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, neighborhoodsApi, ordersApi, settingsApi } from '../lib/supabase.js';
 
+// Normaliza campos Supabase -> formato legado do frontend
+function normalizeProduct(p) {
+  if (!p) return p;
+  return {
+    ...p,
+    price: p.price ?? p.base_price,
+    base_price: p.base_price ?? p.price,
+    image: p.image ?? p.image_url,
+    image_url: p.image_url ?? p.image,
+    order: p.order ?? p.display_order,
+    display_order: p.display_order ?? p.order,
+  };
+}
+function normalizeCategory(c) {
+  if (!c) return c;
+  return { ...c, order: c.order ?? c.display_order, display_order: c.display_order ?? c.order };
+}
+
 class SupabaseStorageEngine {
   constructor() {
     this.storeId = null;
@@ -46,13 +64,39 @@ class SupabaseStorageEngine {
       if (addonsResult.error) throw addonsResult.error;
 
       this._dataCache.store = storeResult.data;
-      this._dataCache.categories = categoriesResult.data || [];
-      this._dataCache.products = productsResult.data || [];
-      this._dataCache.addonGroups = {};
-      if (addonsResult.data) {
-        for (const group of addonsResult.data) {
-          this._dataCache.addonGroups[group.id] = group;
+      this._dataCache.categories = (categoriesResult.data || []).map(normalizeCategory);
+      this._dataCache.products = (productsResult.data || []).map(normalizeProduct);
+
+      // AddonGroups: supabase retorna array; frontend espera {sizes, crusts, extras}
+      if (!addonsResult.data || addonsResult.data.length === 0) {
+        // Nenhum grupo cadastrado no Supabase -> usa mock padrão (tamanhos/bordas/extras)
+        this._dataCache.addonGroups = window.INITIAL_ADDON_GROUPS ? JSON.parse(JSON.stringify(window.INITIAL_ADDON_GROUPS)) : {};
+      } else {
+        const mapped = {};
+        for (const g of addonsResult.data) {
+          const opts = (g.addon_options || []).map(o => ({
+            id: o.id,
+            name: o.name,
+            price: Number(o.price_diff ?? o.price ?? 0),
+            price_diff: Number(o.price_diff ?? o.price ?? 0),
+            allows_half_half: o.allows_half_half,
+            is_default: o.is_default,
+            default: o.is_default
+          }));
+          const nameKey = (g.name + ' ' + (g.title||'')).toLowerCase();
+          let key = g.id;
+          if (nameKey.includes('tamanho')) key = 'sizes';
+          else if (nameKey.includes('borda') || nameKey.includes('crust')) key = 'crusts';
+          else if (nameKey.includes('extra') || nameKey.includes('adicional')) key = 'extras';
+          const entry = { id: g.id, title: g.title || g.name, name: g.name, type: g.type, required: g.required, options: opts };
+          mapped[key] = entry;
+          mapped[g.id] = entry;
         }
+        // Garante fallback se algum tipo não veio do banco
+        if (!mapped.sizes && window.INITIAL_ADDON_GROUPS?.sizes) mapped.sizes = window.INITIAL_ADDON_GROUPS.sizes;
+        if (!mapped.crusts && window.INITIAL_ADDON_GROUPS?.crusts) mapped.crusts = window.INITIAL_ADDON_GROUPS.crusts;
+        if (!mapped.extras && window.INITIAL_ADDON_GROUPS?.extras) mapped.extras = window.INITIAL_ADDON_GROUPS.extras;
+        this._dataCache.addonGroups = mapped;
       }
       this._dataCache.neighborhoods = neighborhoodsResult.data || [];
       this._dataCache.settings = settingsResult.data || {};

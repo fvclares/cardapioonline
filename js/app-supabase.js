@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   try {
     // 2. Busca loja por slug no Supabase
-    const { storeApi } = await import('./lib/supabase.js?v=5');
+    const { storeApi } = await import('./lib/supabase.js?v=6');
     const { data: store, error } = await storeApi.getBySlug(slug);
     
     if (error || !store) {
@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // 3. Inicializa storage com store_id
-    const { storage } = await import('./state/storage-supabase.js?v=5');
+    const { storage } = await import('./state/storage-supabase.js?v=6');
     await storage.init(store.id);
     // Garante que appState leia o cache recém-carregado
     if (window.appState) {
