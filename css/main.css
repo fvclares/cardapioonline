@@ -348,10 +348,19 @@ input::placeholder, textarea::placeholder {
   color: var(--text-primary);
 }
 
+.modal-sheet > form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .modal-body {
   padding: 1.25rem 1.5rem;
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
 }
 
 .modal-footer {
