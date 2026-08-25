@@ -153,6 +153,10 @@
           <span class="admin-nav-icon">📋</span>
           <span>Pedidos</span>
         </button>
+        <button class="admin-nav-item" data-tab="tab-addons">
+          <span class="admin-nav-icon">🧀</span>
+          <span>Bordas & Extras</span>
+        </button>
         <button class="admin-nav-item" data-tab="tab-share">
           <span class="admin-nav-icon">🔗</span>
           <span>Link da Loja</span>
@@ -384,6 +388,22 @@
           </div>
         </div>
 
+        <!-- TAB: Bordas & Extras -->
+        <div class="tab-panel" id="tab-addons">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h2 class="admin-card-title">🧀 Bordas & Extras</h2>
+              <button class="btn btn-primary btn-sm" id="btnNewAddonGroup">
+                + Novo Grupo
+              </button>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 1.25rem; font-size: 0.9rem;">
+              Crie grupos de personalização (ex: Tamanhos, Bordas, Adicionais) e suas opções com preço. Tamanhos aparecem só para pizzas.
+            </p>
+            <div id="addonsListContainer"></div>
+          </div>
+        </div>
+
         <!-- TAB 6: Convites (Superadmin) -->
         <div class="tab-panel" id="tab-invites">
           <div class="admin-card">
@@ -574,7 +594,106 @@
     </div>
   </div>
 
+  <!-- Modal: Grupo de Adicionais -->
+  <div id="addonGroupModalBackdrop" class="modal-backdrop">
+    <div class="modal-sheet" style="max-width: 500px;">
+      <div class="modal-header">
+        <div class="modal-title" id="addonGroupModalTitle">Novo Grupo</div>
+        <button class="modal-close-btn" id="btnCloseAddonGroupModal">✕</button>
+      </div>
+      <form id="addonGroupForm">
+        <div class="modal-body">
+          <input type="hidden" id="addonGroupEditId" />
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label">Título exibido *</label>
+            <input type="text" id="addonGroupTitleInput" placeholder="Ex: Escolha o Tamanho" required />
+          </div>
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label">Nome interno</label>
+            <input type="text" id="addonGroupNameInput" placeholder="Ex: sizes, crusts, extras" />
+            <span class="form-help">sugestão: sizes, crusts ou extras para ligar ao cardápio</span>
+          </div>
+          <div class="form-grid form-grid-2" style="margin-bottom: 1rem;">
+            <div class="form-group">
+              <label class="form-label">Tipo *</label>
+              <select id="addonGroupTypeInput" required>
+                <option value="single">Escolha única (radio)</option>
+                <option value="multiple">Múltipla escolha (checkbox)</option>
+              </select>
+            </div>
+            <div class="form-group" style="display:flex; align-items:flex-end; padding-bottom:0.4rem;">
+              <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                <input type="checkbox" id="addonGroupRequiredInput" style="width:auto;" />
+                Obrigatório
+              </label>
+            </div>
+          </div>
+          <div class="form-grid form-grid-2" style="margin-bottom: 1rem;">
+            <div class="form-group">
+              <label class="form-label">Ordem</label>
+              <input type="number" id="addonGroupOrderInput" value="1" min="1" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Aplica em</label>
+              <input type="text" id="addonGroupAppliesInput" placeholder="pizza, todos..." />
+              <span class="form-help">deixe vazio = todos os produtos</span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btnCancelAddonGroup">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Grupo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Opção do Grupo -->
+  <div id="addonOptionModalBackdrop" class="modal-backdrop">
+    <div class="modal-sheet" style="max-width: 480px;">
+      <div class="modal-header">
+        <div class="modal-title" id="addonOptionModalTitle">Nova Opção</div>
+        <button class="modal-close-btn" id="btnCloseAddonOptionModal">✕</button>
+      </div>
+      <form id="addonOptionForm">
+        <div class="modal-body">
+          <input type="hidden" id="addonOptionEditId" />
+          <input type="hidden" id="addonOptionGroupId" />
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label">Nome da opção *</label>
+            <input type="text" id="addonOptionNameInput" placeholder="Ex: Borda Catupiry, Bacon Extra" required />
+          </div>
+          <div class="form-grid form-grid-2" style="margin-bottom: 1rem;">
+            <div class="form-group">
+              <label class="form-label">Diferença de preço (R$) *</label>
+              <input type="number" step="0.50" id="addonOptionPriceInput" value="0" required />
+              <span class="form-help">positivo = adicional, negativo = desconto</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Ordem</label>
+              <input type="number" id="addonOptionOrderInput" value="1" min="1" />
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:0.6rem;">
+            <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+              <input type="checkbox" id="addonOptionDefaultInput" style="width:auto;" />
+              Opção padrão (pré-selecionada)
+            </label>
+            <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+              <input type="checkbox" id="addonOptionHalfInput" style="width:auto;" />
+              Permite meio a meio (apenas tamanhos)
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btnCancelAddonOption">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Opção</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Scripts (Module) -->
-  <script type="module" src="js/admin-supabase.js?v=5"></script>
+  <script type="module" src="js/admin-supabase.js?v=7"></script>
 </body>
 </html>

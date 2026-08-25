@@ -4,8 +4,8 @@
  * Sistema de Convites (invite-only)
  */
 
-import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi } from './lib/supabase.js?v=5';
-import storage from './state/storage-supabase.js?v=5';
+import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi } from './lib/supabase.js?v=7';
+import storage from './state/storage-supabase.js?v=7';
 
 // Expose para compatibilidade global
 window.supabase = supabase;
@@ -14,6 +14,7 @@ window.storeApi = storeApi;
 window.categoriesApi = categoriesApi;
 window.productsApi = productsApi;
 window.addonGroupsApi = addonGroupsApi;
+window.addonOptionsApi = addonOptionsApi;
 window.neighborhoodsApi = neighborhoodsApi;
 window.ordersApi = ordersApi;
 window.settingsApi = settingsApi;
@@ -948,6 +949,7 @@ const tabTitles = {
   'tab-categories': 'Gestão de Categorias',
   'tab-products': 'Catálogo de Produtos & Preços',
   'tab-orders': 'Pedidos Recebidos',
+  'tab-addons': 'Bordas & Extras',
   'tab-share': 'Link da Loja',
   'tab-invites': 'Gerenciar Convites',
   'tab-create-store': 'Criar Sua Loja'
@@ -970,6 +972,7 @@ navItems.forEach(item => {
     if (tabId === 'tab-categories') renderCategories();
     if (tabId === 'tab-products') renderProducts();
     if (tabId === 'tab-orders') renderOrders();
+    if (tabId === 'tab-addons') renderAddons();
     if (tabId === 'tab-share') updatePublicUrl(currentStore?.slug);
     if (tabId === 'tab-invites') renderInvites();
   });
@@ -1182,6 +1185,184 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
   document.getElementById('inviteModalBackdrop').classList.remove('active');
   document.getElementById('inviteForm').reset();
   renderInvites();
+});
+
+// ============================================
+// BORDAS & EXTRAS (Addon Groups & Options)
+// ============================================
+
+async function renderAddons() {
+  const container = document.getElementById('addonsListContainer');
+  if (!currentStoreId) {
+    container.innerHTML = `<p style="color: var(--text-muted);">Crie sua loja primeiro.</p>`;
+    return;
+  }
+  const { data, error } = await addonGroupsApi.list(currentStoreId);
+  if (error) {
+    container.innerHTML = `<p style="color: var(--status-closed);">Erro: ${error.message}</p>`;
+    return;
+  }
+  if (!data?.length) {
+    container.innerHTML = `
+      <div style="text-align:center; padding:2rem; color:var(--text-muted); border:1px dashed var(--border); border-radius:var(--radius-md);">
+        <div style="font-size:2rem;">🧀</div>
+        <p style="font-weight:600; color:var(--text-secondary);">Nenhum grupo cadastrado</p>
+        <p style="font-size:0.85rem; margin-top:0.25rem;">Crie grupos como "Tamanhos", "Bordas Recheadas" e "Adicionais Extras".<br>Se deixar vazio, o cardápio usa o padrão local.</p>
+      </div>`;
+    return;
+  }
+  container.innerHTML = data.map(group => {
+    const opts = group.addon_options || [];
+    return `
+      <div class="admin-card" style="margin-bottom:1rem; padding:1rem; border:1px solid var(--border);">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem;">
+          <div>
+            <div style="font-weight:800;">${group.title || group.name} <span style="font-weight:400; font-size:0.75rem; color:var(--text-muted);">(${group.type === 'single' ? 'única' : 'múltipla'}${group.required ? ' • obrigatório' : ''})</span></div>
+            <div style="font-size:0.75rem; color:var(--text-muted);">nome: ${group.name} • ordem: ${group.display_order} ${group.applies_to?.length ? '• aplica: ' + group.applies_to.join(',') : ''}</div>
+          </div>
+          <div style="display:flex; gap:0.4rem; flex-shrink:0;">
+            <button class="btn btn-secondary btn-sm btn-edit-addon-group" data-id="${group.id}">✏️</button>
+            <button class="btn btn-secondary btn-sm btn-delete-addon-group" data-id="${group.id}" style="color:var(--status-closed);">🗑️</button>
+          </div>
+        </div>
+        <div style="margin-top:0.85rem;">
+          ${opts.length ? `
+            <div style="display:flex; flex-direction:column; gap:0.4rem;">
+              ${opts.sort((a,b)=>a.display_order-b.display_order).map(o=>`
+                <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius-md); padding:0.5rem 0.75rem;">
+                  <div>
+                    <span style="font-weight:600; font-size:0.88rem;">${o.name}</span>
+                    <span style="font-size:0.75rem; color:var(--text-muted); margin-left:0.4rem;">${o.is_default ? '⭐ padrão' : ''} ${o.allows_half_half ? '• meio a meio' : ''}</span>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:0.5rem;">
+                    <span style="font-weight:700; font-size:0.85rem; color:var(--primary);">${o.price_diff>0?'+ ':''}${formatCurrency(o.price_diff)}</span>
+                    <button class="btn btn-secondary btn-sm btn-edit-addon-option" data-id="${o.id}" data-group="${group.id}" style="padding:0.2rem 0.4rem;">✏️</button>
+                    <button class="btn btn-secondary btn-sm btn-delete-addon-option" data-id="${o.id}" style="padding:0.2rem 0.4rem; color:var(--status-closed);">✕</button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          ` : `<p style="font-size:0.8rem; color:var(--text-muted);">Nenhuma opção ainda.</p>`}
+          <button class="btn btn-secondary btn-sm btn-new-addon-option" data-group="${group.id}" style="margin-top:0.6rem;">+ Opção</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.querySelectorAll('.btn-edit-addon-group').forEach(b=> b.addEventListener('click', ()=> openAddonGroupModal(b.dataset.id)));
+  container.querySelectorAll('.btn-delete-addon-group').forEach(b=> b.addEventListener('click', ()=> deleteAddonGroup(b.dataset.id)));
+  container.querySelectorAll('.btn-new-addon-option').forEach(b=> b.addEventListener('click', ()=> openAddonOptionModal(b.dataset.group)));
+  container.querySelectorAll('.btn-edit-addon-option').forEach(b=> b.addEventListener('click', ()=> openAddonOptionModal(b.dataset.group, b.dataset.id)));
+  container.querySelectorAll('.btn-delete-addon-option').forEach(b=> b.addEventListener('click', ()=> deleteAddonOption(b.dataset.id)));
+}
+
+function openAddonGroupModal(groupId=null){
+  const modal=document.getElementById('addonGroupModalBackdrop');
+  const title=document.getElementById('addonGroupModalTitle');
+  document.getElementById('addonGroupEditId').value=groupId||'';
+  if(!groupId){
+    title.textContent='Novo Grupo';
+    document.getElementById('addonGroupForm').reset();
+    document.getElementById('addonGroupOrderInput').value='1';
+  } else {
+    title.textContent='Editar Grupo';
+    addonGroupsApi.list(currentStoreId).then(({data})=>{
+      const g=data?.find(x=>x.id===groupId);
+      if(!g) return;
+      document.getElementById('addonGroupTitleInput').value=g.title||'';
+      document.getElementById('addonGroupNameInput').value=g.name||'';
+      document.getElementById('addonGroupTypeInput').value=g.type||'single';
+      document.getElementById('addonGroupRequiredInput').checked=!!g.required;
+      document.getElementById('addonGroupOrderInput').value=g.display_order||1;
+      document.getElementById('addonGroupAppliesInput').value=(g.applies_to||[]).join(', ');
+    });
+  }
+  modal.classList.add('active');
+}
+function closeAddonGroupModal(){ document.getElementById('addonGroupModalBackdrop').classList.remove('active'); }
+async function deleteAddonGroup(id){
+  if(!confirm('Excluir este grupo e todas as suas opções?')) return;
+  showLoading(true);
+  const {error}=await addonGroupsApi.delete(id);
+  showLoading(false);
+  if(error) showToast(error.message,'error'); else { showToast('🗑️ Grupo removido','success'); renderAddons(); }
+}
+async function openAddonOptionModal(groupId, optionId=null){
+  const modal=document.getElementById('addonOptionModalBackdrop');
+  const title=document.getElementById('addonOptionModalTitle');
+  document.getElementById('addonOptionGroupId').value=groupId;
+  document.getElementById('addonOptionEditId').value=optionId||'';
+  if(!optionId){
+    title.textContent='Nova Opção';
+    document.getElementById('addonOptionForm').reset();
+    document.getElementById('addonOptionOrderInput').value='1';
+    document.getElementById('addonOptionPriceInput').value='0';
+  } else {
+    title.textContent='Editar Opção';
+    const {data:groups}=await addonGroupsApi.list(currentStoreId);
+    const g=groups?.find(x=>x.id===groupId);
+    const o=g?.addon_options?.find(x=>x.id===optionId);
+    if(!o) return;
+    document.getElementById('addonOptionNameInput').value=o.name||'';
+    document.getElementById('addonOptionPriceInput').value=o.price_diff ?? 0;
+    document.getElementById('addonOptionOrderInput').value=o.display_order||1;
+    document.getElementById('addonOptionDefaultInput').checked=!!o.is_default;
+    document.getElementById('addonOptionHalfInput').checked=!!o.allows_half_half;
+  }
+  modal.classList.add('active');
+}
+function closeAddonOptionModal(){ document.getElementById('addonOptionModalBackdrop').classList.remove('active'); }
+async function deleteAddonOption(id){
+  if(!confirm('Excluir esta opção?')) return;
+  showLoading(true);
+  const {error}=await addonOptionsApi.delete(id);
+  showLoading(false);
+  if(error) showToast(error.message,'error'); else { showToast('🗑️ Opção removida','success'); renderAddons(); }
+}
+
+document.getElementById('btnNewAddonGroup').addEventListener('click', ()=> openAddonGroupModal());
+document.getElementById('btnCloseAddonGroupModal').addEventListener('click', closeAddonGroupModal);
+document.getElementById('btnCancelAddonGroup').addEventListener('click', closeAddonGroupModal);
+document.getElementById('addonGroupForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const id=document.getElementById('addonGroupEditId').value;
+  const payload={
+    title: document.getElementById('addonGroupTitleInput').value.trim(),
+    name: document.getElementById('addonGroupNameInput').value.trim().toLowerCase().replace(/\s+/g,'_') || document.getElementById('addonGroupTitleInput').value.trim().toLowerCase().replace(/\s+/g,'_'),
+    type: document.getElementById('addonGroupTypeInput').value,
+    required: document.getElementById('addonGroupRequiredInput').checked,
+    display_order: Number(document.getElementById('addonGroupOrderInput').value)||1,
+    applies_to: document.getElementById('addonGroupAppliesInput').value.split(',').map(s=>s.trim()).filter(Boolean)
+  };
+  showLoading(true);
+  let error;
+  if(id){ const r=await addonGroupsApi.update(id,payload); error=r.error; }
+  else { const r=await addonGroupsApi.create(currentStoreId,payload); error=r.error; }
+  showLoading(false);
+  if(error) showToast(error.message,'error');
+  else { closeAddonGroupModal(); showToast('✅ Grupo salvo!','success'); renderAddons(); }
+});
+
+document.getElementById('btnCloseAddonOptionModal').addEventListener('click', closeAddonOptionModal);
+document.getElementById('btnCancelAddonOption').addEventListener('click', closeAddonOptionModal);
+document.getElementById('addonOptionForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const id=document.getElementById('addonOptionEditId').value;
+  const groupId=document.getElementById('addonOptionGroupId').value;
+  const payload={
+    name: document.getElementById('addonOptionNameInput').value.trim(),
+    price_diff: Number(document.getElementById('addonOptionPriceInput').value)||0,
+    display_order: Number(document.getElementById('addonOptionOrderInput').value)||1,
+    is_default: document.getElementById('addonOptionDefaultInput').checked,
+    allows_half_half: document.getElementById('addonOptionHalfInput').checked
+  };
+  showLoading(true);
+  let error;
+  if(id){ const r=await addonOptionsApi.update(id,payload); error=r.error; }
+  else { const r=await addonOptionsApi.create(groupId,payload); error=r.error; }
+  showLoading(false);
+  if(error) showToast(error.message,'error');
+  else { closeAddonOptionModal(); showToast('✅ Opção salva!','success'); renderAddons(); }
 });
 
 // Auto-gera slug do convite a partir do nome
