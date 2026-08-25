@@ -50,9 +50,13 @@ function renderProductSections(container, searchQuery = '', onSelectProduct) {
                   <button class="btn-add-circle" title="Adicionar à sacola">+</button>
                 </div>
               </div>
+              ${product.image ? `
               <div class="product-image-container">
-                <img src="${product.image || 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80'}" alt="${product.name}" class="product-image" loading="lazy" />
-              </div>
+                <img src="${product.image}" alt="${product.name}" class="product-image" loading="lazy" />
+              </div>` : `
+              <div class="product-image-container" style="display:flex; align-items:center; justify-content:center; background:var(--bg-input); border:1px dashed var(--border); border-radius:var(--radius-md); min-height:90px; color:var(--text-muted); font-size:0.75rem;">
+                Sem imagem
+              </div>`}
             </div>
           `).join('')}
         </div>

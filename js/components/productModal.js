@@ -44,7 +44,7 @@ function setupProductModal() {
       </div>
 
       <div class="modal-body">
-        <img src="${product.image || 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80'}" alt="${product.name}" class="custom-modal-img" />
+        ${product.image ? `<img src="${product.image}" alt="${product.name}" class="custom-modal-img" />` : ''}
         
         <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.25rem; line-height: 1.4;">
           ${product.description || ''}
