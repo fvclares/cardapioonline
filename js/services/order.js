@@ -4,11 +4,16 @@
  */
 
 const orderService = {
-  // Gera identificador sequencial amigável para o pedido (ex: #1042)
+  // Gera identificador sequencial (evita NaN quando storage é assíncrono)
   generateOrderNumber() {
-    const existingOrders = window.storage?.getOrders() || [];
-    const baseNumber = 1040;
-    return '#' + (baseNumber + existingOrders.length + 1);
+    try {
+      const existing = window.storage?.getOrders();
+      if (Array.isArray(existing)) return '#' + (1040 + existing.length + 1);
+      // storage assíncrono (Supabase) -> usa contador local
+      const local = JSON.parse(localStorage.getItem('cardapio_orders') || '[]');
+      if (Array.isArray(local) && local.length) return '#' + (1040 + local.length + 1);
+    } catch {}
+    return '#' + Date.now().toString().slice(-6);
   },
 
   // Cria um snapshot completo e congelado do pedido
