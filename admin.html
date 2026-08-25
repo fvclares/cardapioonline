@@ -18,7 +18,7 @@
   <style>
     /* Auth Gate - Supabase Magic Link */
     .auth-gate {
-      display: none; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      display: none; min-height: 100vh; align-items: center; justify-content: center;
       background: var(--bg-primary); padding: 1rem;
     }
     .auth-gate.active { display: flex; }
@@ -39,7 +39,7 @@
     .auth-divider { display: flex; align-items: center; gap: 1rem; color: var(--text-muted); font-size: 0.85rem; margin: 0.5rem 0; }
     .auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
     .admin-layout { display: none; }
-    .admin-layout.authenticated { display: grid; }
+    .admin-layout.authenticated { display: flex; }
     .logout-btn { background: none; border: 1px solid var(--border); color: var(--text-secondary); padding: 0.5rem 0.875rem; border-radius: var(--radius-md); font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; }
     .logout-btn:hover { background: var(--bg-input); color: var(--status-closed); border-color: var(--status-closed); }
     .user-badge { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.75rem; background: var(--bg-input); border-radius: var(--radius-md); font-size: 0.75rem; color: var(--text-secondary); }
@@ -575,6 +575,6 @@
   </div>
 
   <!-- Scripts (Module) -->
-  <script type="module" src="js/admin-supabase.js?v=4"></script>
+  <script type="module" src="js/admin-supabase.js?v=5"></script>
 </body>
 </html>
