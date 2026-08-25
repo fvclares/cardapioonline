@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Redirecionando...</title>
+  <script>
+    // GitHub Pages SPA redirect - mantém a rota no hash
+    sessionStorage.redirect = location.href;
+    window.location.href = '/cardapioonline/#' + location.pathname.slice(1) + location.search + location.hash;
+  </script>
+</head>
+<body>
+  Redirecionando para o cardápio...
+</body>
+</html>

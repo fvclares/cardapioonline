@@ -2,19 +2,18 @@
   "name": "cardapio-online-whatsapp",
   "version": "1.0.0",
   "type": "module",
-  "description": "Cardápio Online com envio direto de pedidos para o WhatsApp",
-  "main": "server.js",
+  "description": "Cardápio Online com envio direto de pedidos para o WhatsApp - Static Site para GitHub Pages",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js",
     "test": "node tests/verify_endpoints.js && node tests/verify_whatsapp_logic.js"
   },
   "keywords": [
     "cardapio",
     "whatsapp",
     "delivery",
-    "pizzaria"
+    "pizzaria",
+    "github-pages"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {}
 }

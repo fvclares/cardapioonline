@@ -54,12 +54,31 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('storeLogoInput').value = store.logo || '';
     document.getElementById('storeCoverInput').value = store.cover || '';
 
+    if (store.logo) showPreview('storeLogoPreview', store.logo);
+    if (store.cover) showPreview('storeCoverPreview', store.cover);
+
     const isOpen = store.status === 'open';
     statusInput.checked = isOpen;
     statusText.textContent = isOpen ? 'Aberto' : 'Fechado';
     statusText.style.color = isOpen ? 'var(--status-open)' : 'var(--status-closed)';
 
     sidebarStoreName.textContent = store.name || 'Pizzaria';
+
+    // Live preview for URL inputs
+    document.getElementById('storeLogoInput').addEventListener('input', (e) => {
+      if (e.target.value) showPreview('storeLogoPreview', e.target.value);
+      else document.getElementById('storeLogoPreview').innerHTML = '';
+    });
+    document.getElementById('storeCoverInput').addEventListener('input', (e) => {
+      if (e.target.value) showPreview('storeCoverPreview', e.target.value);
+      else document.getElementById('storeCoverPreview').innerHTML = '';
+    });
+  }
+
+  function showPreview(containerId, imageUrl) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = `<img src="${imageUrl}" alt="Preview" style="max-width: 180px; max-height: 100px; border-radius: var(--radius-md); border: 1px solid var(--border);" />`;
   }
 
   statusInput.addEventListener('change', () => {
@@ -280,6 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const crustsInput = document.getElementById('prodHasCrustsInput');
     const extrasInput = document.getElementById('prodHasExtrasInput');
     const availInput = document.getElementById('prodAvailableInput');
+    const previewContainer = document.getElementById('prodImagePreview');
 
     updateCategoryDropdowns();
 
@@ -292,6 +312,7 @@ document.addEventListener('DOMContentLoaded', () => {
       priceInput.value = prod.price;
       descInput.value = prod.description || '';
       imgInput.value = prod.image || '';
+      if (prod.image) showPreview('prodImagePreview', prod.image);
       crustsInput.checked = !!prod.has_crusts;
       extrasInput.checked = !!prod.has_extras;
       availInput.checked = prod.available !== false;
@@ -302,10 +323,17 @@ document.addEventListener('DOMContentLoaded', () => {
       priceInput.value = '';
       descInput.value = '';
       imgInput.value = '';
+      previewContainer.innerHTML = '';
       crustsInput.checked = true;
       extrasInput.checked = true;
       availInput.checked = true;
     }
+
+    // Live preview for URL input
+    imgInput.oninput = (e) => {
+      if (e.target.value) showPreview('prodImagePreview', e.target.value);
+      else previewContainer.innerHTML = '';
+    };
 
     productModalBackdrop.classList.add('active');
   }
