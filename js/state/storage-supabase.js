@@ -240,13 +240,44 @@ class SupabaseStorageEngine {
     return this._dataCache.settings || {};
   }
 
+  // --- Customer (sempre local, por dispositivo) ---
+  getCustomerToken() {
+    const k = 'cardapio_customer_token';
+    let t = null;
+    try { t = localStorage.getItem(k); } catch { t = this.localCache[k] || null; }
+    if (!t) {
+      t = 'cust_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+      try { localStorage.setItem(k, t); } catch { this.localCache[k] = t; }
+    }
+    return t;
+  }
+  getCustomerProfile() {
+    const k = 'cardapio_customer_profile';
+    try {
+      const d = localStorage.getItem(k);
+      return d ? JSON.parse(d) : null;
+    } catch { const d = this.localCache[k]; return d ? JSON.parse(d) : null; }
+  }
+  saveCustomerProfile(profile) {
+    const token = this.getCustomerToken();
+    const customer = { token, ...profile, updated_at: new Date().toISOString() };
+    const k = 'cardapio_customer_profile';
+    try { localStorage.setItem(k, JSON.stringify(customer)); } catch { this.localCache[k] = JSON.stringify(customer); }
+    return customer;
+  }
+
   async getOrders() {
     if (this.useLocalFallback) {
       return JSON.parse(this.getItem('cardapio_orders') || '[]');
     }
-    const { data, error } = await ordersApi.list(this.storeId);
-    if (error) throw error;
-    return data;
+    try {
+      const { data, error } = await ordersApi.list(this.storeId);
+      if (error) throw error;
+      return data || [];
+    } catch (e) {
+      // Guest não tem permissão para listar - retorna local
+      try { return JSON.parse(this.getItem('cardapio_orders') || '[]'); } catch { return []; }
+    }
   }
 
   async saveOrder(order) {
@@ -257,10 +288,35 @@ class SupabaseStorageEngine {
       this.emitChange('order_created', order);
       return order;
     }
-    const { data, error } = await ordersApi.create(this.storeId, order);
-    if (error) throw error;
-    this.emitChange('order_created', data);
-    return data;
+    // Mapeia snapshot do orderService para colunas da tabela orders
+    try {
+      const dbOrder = {
+        customer_name: order.customer?.name || order.customer_name || 'Cliente',
+        customer_phone: order.customer?.phone || order.customer_phone || '',
+        customer_email: order.customer?.email || null,
+        customer_address: order.deliveryAddress || order.customer_address || null,
+        order_type: order.orderType || order.order_type || 'delivery',
+        items: order.items || [],
+        subtotal: Number(order.subtotal || 0),
+        delivery_fee: Number(order.deliveryFee || order.delivery_fee || 0),
+        total: Number(order.total || 0),
+        payment_method: order.payment?.method || order.payment_method || 'pix',
+        notes: order.notes || '',
+        status: 'received'
+      };
+      const { data, error } = await ordersApi.create(this.storeId, dbOrder);
+      if (error) throw error;
+      this.emitChange('order_created', data);
+      return data;
+    } catch (e) {
+      console.warn('ordersApi.create falhou, salvando local:', e.message);
+      // Fallback local para não bloquear WhatsApp
+      const orders = JSON.parse(this.getItem('cardapio_orders') || '[]');
+      orders.unshift(order);
+      this.setItem('cardapio_orders', JSON.stringify(orders));
+      this.emitChange('order_created', order);
+      return order;
+    }
   }
 
   async getLastOrder() {
