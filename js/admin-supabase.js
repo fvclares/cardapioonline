@@ -4,8 +4,8 @@
  * Sistema de Convites (invite-only)
  */
 
-import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi } from './lib/supabase.js?v=3';
-import storage from './state/storage-supabase.js?v=3';
+import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi } from './lib/supabase.js?v=4';
+import storage from './state/storage-supabase.js?v=4';
 
 // Expose para compatibilidade global
 window.supabase = supabase;
@@ -70,50 +70,13 @@ function formatPhone(phone) {
 async function initAuth() {
   const authGate = document.getElementById('authGate');
   const adminLayout = document.getElementById('adminLayout');
-  const magicLinkForm = document.getElementById('magicLinkForm');
   const passwordForm = document.getElementById('passwordForm');
   const inviteSignupForm = document.getElementById('inviteSignupForm');
-  const toggleAuthMode = document.getElementById('toggleAuthMode');
   const logoutBtn = document.getElementById('logoutBtn');
 
   // ============================================
   // PRIMEIRO: registra TODOS os event listeners
   // ============================================
-
-  // Toggle auth mode
-  toggleAuthMode.addEventListener('click', () => {
-    const isMagic = magicLinkForm.style.display !== 'none';
-    magicLinkForm.style.display = isMagic ? 'none' : 'block';
-    passwordForm.style.display = isMagic ? 'block' : 'none';
-    toggleAuthMode.textContent = isMagic ? 'Alternar para link mágico' : 'Alternar para login com senha';
-    document.getElementById('authError').textContent = '';
-    document.getElementById('passwordError').textContent = '';
-  });
-
-  // Magic Link Form
-  magicLinkForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const btn = document.getElementById('magicLinkBtn');
-    const email = document.getElementById('magicLinkEmail').value.trim();
-    const errorEl = document.getElementById('authError');
-    const successEl = document.getElementById('authSuccess');
-
-    btn.disabled = true;
-    btn.textContent = 'Enviando...';
-    errorEl.textContent = '';
-    successEl.textContent = '';
-
-    const { error } = await auth.signInWithMagicLink(email, window.location.origin + '/admin.html');
-    
-    if (error) {
-      errorEl.textContent = error.message;
-    } else {
-      successEl.textContent = '✅ Link mágico enviado! Verifique seu e-mail (incluindo spam).';
-      magicLinkForm.reset();
-    }
-    btn.disabled = false;
-    btn.textContent = '🔗 Enviar Link Mágico';
-  });
 
   // Password Form
   passwordForm.addEventListener('submit', async (e) => {
@@ -133,7 +96,7 @@ async function initAuth() {
       errorEl.textContent = error.message;
     }
     btn.disabled = false;
-    btn.textContent = 'Entrar com Senha';
+    btn.textContent = 'Entrar';
   });
 
   // Invite Signup Form
@@ -170,9 +133,9 @@ async function initAuth() {
       }
     } else if (data?.user) {
       if (data.session) {
-        document.getElementById('authSuccess').textContent = '✅ Conta criada! Redirecionando...';
+        showToast('✅ Conta criada! Entrando...', 'success');
       } else {
-        document.getElementById('authSuccess').textContent = '✅ Conta criada! Verifique seu e-mail para confirmar.';
+        showToast('✅ Conta criada! Verifique seu e-mail para confirmar.', 'success');
       }
     }
     btn.disabled = false;
@@ -226,10 +189,7 @@ async function initAuth() {
 
 async function setupInviteSignup(token) {
   const inviteSignupForm = document.getElementById('inviteSignupForm');
-  const magicLinkForm = document.getElementById('magicLinkForm');
   const passwordForm = document.getElementById('passwordForm');
-  const authDivider = document.getElementById('authDivider');
-  const authHint = document.getElementById('authHint');
   const authTitle = document.getElementById('authTitle');
   const authSubtitle = document.getElementById('authSubtitle');
   const inviteTokenInput = document.getElementById('inviteTokenValue');
@@ -240,10 +200,7 @@ async function setupInviteSignup(token) {
   
   if (!result?.[0]?.is_valid) {
     authSubtitle.textContent = 'Este convite é inválido ou expirou.';
-    magicLinkForm.style.display = 'none';
     passwordForm.style.display = 'none';
-    authDivider.style.display = 'none';
-    authHint.style.display = 'none';
     return;
   }
 
@@ -252,10 +209,7 @@ async function setupInviteSignup(token) {
 
   // Mostra formulário de convite, esconde login
   inviteSignupForm.style.display = 'flex';
-  magicLinkForm.style.display = 'none';
   passwordForm.style.display = 'none';
-  authDivider.style.display = 'none';
-  authHint.style.display = 'none';
   authTitle.textContent = '✉️ Cadastro por Convite';
 
   // Preenche email e hint da loja
@@ -348,15 +302,10 @@ function onAuthLogout() {
   document.querySelectorAll('.admin-nav-item').forEach(item => item.style.display = 'flex');
   
   // Reset forms
-  document.getElementById('magicLinkForm').reset();
   document.getElementById('passwordForm').reset();
   document.getElementById('inviteSignupForm').reset();
-  document.getElementById('passwordForm').style.display = 'none';
+  document.getElementById('passwordForm').style.display = 'block';
   document.getElementById('inviteSignupForm').style.display = 'none';
-  document.getElementById('magicLinkForm').style.display = 'block';
-  document.getElementById('authDivider').style.display = 'flex';
-  document.getElementById('authHint').style.display = 'block';
-  document.getElementById('toggleAuthMode').textContent = 'Alternar para login com senha';
   document.getElementById('authTitle').textContent = '🍕 Cardápio Online';
   document.getElementById('authSubtitle').textContent = 'Painel administrativo multi-loja. Faça login para gerenciar sua pizzaria.';
 

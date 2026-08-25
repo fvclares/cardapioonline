@@ -101,22 +101,8 @@
         <input type="hidden" id="inviteTokenValue" />
       </form>
 
-      <!-- Form: Login normal (Magic Link) -->
-      <form class="auth-form" id="magicLinkForm">
-        <label style="display: flex; flex-direction: column; gap: 0.4rem;">
-          <span style="font-size: 0.85rem; font-weight: 600;">📧 Seu e-mail</span>
-          <input type="email" class="auth-input" id="magicLinkEmail" placeholder="voce@pizzaria.com" required autocomplete="email" />
-        </label>
-        <button type="submit" class="auth-btn" id="magicLinkBtn">
-          🔗 Enviar Link Mágico
-        </button>
-        <div class="auth-error" id="authError" aria-live="polite"></div>
-        <div class="auth-success" id="authSuccess" aria-live="polite"></div>
-      </form>
-
-      <div class="auth-divider" id="authDivider">ou</div>
-
-      <form class="auth-form" id="passwordForm" style="display: none;">
+      <!-- Form: Login com Senha -->
+      <form class="auth-form" id="passwordForm">
         <label style="display: flex; flex-direction: column; gap: 0.4rem;">
           <span style="font-size: 0.85rem; font-weight: 600;">📧 E-mail</span>
           <input type="email" class="auth-input" id="passwordEmail" placeholder="voce@pizzaria.com" required autocomplete="email" />
@@ -125,11 +111,11 @@
           <span style="font-size: 0.85rem; font-weight: 600;">🔒 Senha</span>
           <input type="password" class="auth-input" id="passwordInput" placeholder="Sua senha" required autocomplete="current-password" />
         </label>
-        <button type="submit" class="auth-btn" id="passwordBtn">Entrar com Senha</button>
+        <button type="submit" class="auth-btn" id="passwordBtn">Entrar</button>
         <div class="auth-error" id="passwordError" aria-live="polite"></div>
       </form>
 
-      <div class="auth-hint" id="authHint">
+      <div class="auth-hint" id="authHint" style="display: none;">
         <button type="button" id="toggleAuthMode" style="background: none; border: none; color: var(--primary); font: inherit; cursor: pointer; text-decoration: underline;">
           Alternar para login com senha
         </button>
@@ -589,6 +575,6 @@
   </div>
 
   <!-- Scripts (Module) -->
-  <script type="module" src="js/admin-supabase.js?v=3"></script>
+  <script type="module" src="js/admin-supabase.js?v=4"></script>
 </body>
 </html>
