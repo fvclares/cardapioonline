@@ -4,8 +4,8 @@
  * Sistema de Convites (invite-only)
  */
 
-import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi } from './lib/supabase.js?v=7';
-import storage from './state/storage-supabase.js?v=7';
+import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi } from './lib/supabase.js?v=8';
+import storage from './state/storage-supabase.js?v=8';
 
 // Expose para compatibilidade global
 window.supabase = supabase;
@@ -62,6 +62,31 @@ function formatPhone(phone) {
   if (cleaned.length === 11) return cleaned.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
   if (cleaned.length === 10) return cleaned.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
   return phone;
+}
+
+// Compressão de imagem para cardápio (max 800px, JPEG 0.7)
+async function compressImage(file, maxSide = 800, quality = 0.7) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      const scale = Math.min(1, maxSide / Math.max(width, height));
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(blob => {
+        if (!blob) return reject(new Error('Falha ao comprimir'));
+        resolve(new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' }));
+      }, 'image/jpeg', quality);
+      URL.revokeObjectURL(img.src);
+    };
+    img.onerror = () => reject(new Error('Imagem inválida'));
+    img.src = URL.createObjectURL(file);
+  });
 }
 
 // ============================================
@@ -628,6 +653,7 @@ async function openProductModal(prodId = null) {
   const priceInput = document.getElementById('prodPriceInput');
   const descInput = document.getElementById('prodDescriptionInput');
   const imgInput = document.getElementById('prodImageInput');
+  const imgCurrent = document.getElementById('prodImageCurrentUrl');
   const crustsInput = document.getElementById('prodHasCrustsInput');
   const extrasInput = document.getElementById('prodHasExtrasInput');
   const availInput = document.getElementById('prodAvailableInput');
@@ -645,8 +671,10 @@ async function openProductModal(prodId = null) {
       catSelect.value = prod.category_id;
       priceInput.value = prod.base_price;
       descInput.value = prod.description || '';
-      imgInput.value = prod.image_url || '';
+      imgInput.value = '';
+      imgCurrent.value = prod.image_url || '';
       if (prod.image_url) showPreview('prodImagePreview', prod.image_url);
+      else previewContainer.innerHTML = '';
       crustsInput.checked = !!prod.has_crusts;
       extrasInput.checked = !!prod.has_extras;
       availInput.checked = prod.available !== false;
@@ -658,15 +686,28 @@ async function openProductModal(prodId = null) {
     priceInput.value = '';
     descInput.value = '';
     imgInput.value = '';
+    imgCurrent.value = '';
     previewContainer.innerHTML = '';
     crustsInput.checked = true;
     extrasInput.checked = true;
     availInput.checked = true;
   }
 
-  imgInput.oninput = (e) => {
-    if (e.target.value) showPreview('prodImagePreview', e.target.value);
-    else previewContainer.innerHTML = '';
+  imgInput.onchange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        showToast('⚠️ Imagem muito grande (max 5MB)', 'error');
+        imgInput.value = '';
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      showPreview('prodImagePreview', url);
+    } else if (imgCurrent.value) {
+      showPreview('prodImagePreview', imgCurrent.value);
+    } else {
+      previewContainer.innerHTML = '';
+    }
   };
 
   modal.classList.add('active');
@@ -683,12 +724,29 @@ document.getElementById('btnCancelProduct').addEventListener('click', closeProdu
 document.getElementById('productForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const id = document.getElementById('prodEditId').value;
+  const fileInput = document.getElementById('prodImageInput');
+  const currentUrl = document.getElementById('prodImageCurrentUrl').value;
+
+  // Upload com compressão se houver arquivo novo
+  let imageUrl = currentUrl || '';
+  if (fileInput.files?.[0]) {
+    try {
+      const compressed = await compressImage(fileInput.files[0], 800, 0.7);
+      const { data, error } = await storageApi.uploadProductImage(currentStoreId, compressed, compressed.name);
+      if (error) throw error;
+      imageUrl = storageApi.getPublicUrl(data.path);
+    } catch (err) {
+      showToast('Erro ao enviar imagem: ' + err.message, 'error');
+      return;
+    }
+  }
+
   const productData = {
     name: document.getElementById('prodNameInput').value.trim(),
     category_id: document.getElementById('prodCategorySelect').value,
     base_price: Number(document.getElementById('prodPriceInput').value),
     description: document.getElementById('prodDescriptionInput').value.trim(),
-    image_url: document.getElementById('prodImageInput').value.trim(),
+    image_url: imageUrl,
     has_crusts: document.getElementById('prodHasCrustsInput').checked,
     has_extras: document.getElementById('prodHasExtrasInput').checked,
     available: document.getElementById('prodAvailableInput').checked
@@ -1380,11 +1438,4 @@ document.getElementById('inviteStoreNameInput').addEventListener('input', (e) =>
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
   initAuth();
-  
-  // Preview para produto image
-  document.getElementById('prodImageInput').addEventListener('input', (e) => {
-    const preview = document.getElementById('prodImagePreview');
-    if (e.target.value) showPreview('prodImagePreview', e.target.value);
-    else preview.innerHTML = '';
-  });
 });
