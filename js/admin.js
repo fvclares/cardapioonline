@@ -6,6 +6,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   const storage = window.storage;
   const cs = window.customerService;
+  console.log('[DEBUG] admin.js carregado, storage:', !!storage, 'customerService:', !!cs);
 
   // Navigation Tabs
   const navItems = document.querySelectorAll('.admin-nav-item');
@@ -124,15 +125,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }).join('');
 
     categoriesContainer.querySelectorAll('.btn-edit-cat').forEach(btn => {
-      btn.addEventListener('click', () => openCategoryModal(btn.dataset.id));
+      btn.addEventListener('click', () => {
+        console.log('[DEBUG] Botão editar categoria clicado, ID:', btn.dataset.id);
+        openCategoryModal(btn.dataset.id);
+      });
     });
 
     categoriesContainer.querySelectorAll('.btn-del-cat').forEach(btn => {
       btn.addEventListener('click', () => deleteCategory(btn.dataset.id));
     });
+    console.log('[DEBUG] renderCategories finalizado, botões anexados');
   }
 
   function openCategoryModal(catId = null) {
+    console.log('[DEBUG] openCategoryModal chamado com:', catId);
     const titleEl = document.getElementById('categoryModalTitle');
     const idInput = document.getElementById('catEditId');
     const nameInput = document.getElementById('catNameInput');
@@ -140,6 +146,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (catId) {
       const cat = storage.getCategories().find(c => c.id === catId);
+      console.log('[DEBUG] Categoria encontrada:', cat);
+      if (!cat) {
+        alert('Erro: Categoria não encontrada (ID: ' + catId + ')');
+        return;
+      }
       titleEl.textContent = 'Editar Categoria';
       idInput.value = cat.id;
       nameInput.value = cat.name;
@@ -258,18 +269,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }).join('');
 
     productsContainer.querySelectorAll('.btn-edit-prod').forEach(btn => {
-      btn.addEventListener('click', () => openProductModal(btn.dataset.id));
+      btn.addEventListener('click', () => {
+        console.log('[DEBUG] Botão editar produto clicado, ID:', btn.dataset.id);
+        openProductModal(btn.dataset.id);
+      });
     });
 
     productsContainer.querySelectorAll('.btn-del-prod').forEach(btn => {
       btn.addEventListener('click', () => deleteProduct(btn.dataset.id));
     });
+    console.log('[DEBUG] renderProducts finalizado, botões anexados');
   }
 
   filterCatSelect.addEventListener('change', renderProducts);
   filterSearchInput.addEventListener('input', renderProducts);
 
   function openProductModal(prodId = null) {
+    console.log('[DEBUG] openProductModal chamado com:', prodId);
     const titleEl = document.getElementById('productModalTitle');
     const idInput = document.getElementById('prodEditId');
     const nameInput = document.getElementById('prodNameInput');
@@ -285,6 +301,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (prodId) {
       const prod = storage.getProductById(prodId);
+      console.log('[DEBUG] Produto encontrado:', prod);
+      if (!prod) {
+        alert('Erro: Produto não encontrado (ID: ' + prodId + ')');
+        return;
+      }
       titleEl.textContent = 'Editar Produto';
       idInput.value = prod.id;
       nameInput.value = prod.name;
