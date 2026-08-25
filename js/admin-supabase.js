@@ -4,8 +4,8 @@
  * Sistema de Convites (invite-only)
  */
 
-import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi } from './lib/supabase.js?v=9';
-import storage from './state/storage-supabase.js?v=9';
+import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi } from './lib/supabase.js?v=10';
+import storage from './state/storage-supabase.js?v=10';
 
 // Expose para compatibilidade global
 window.supabase = supabase;
@@ -420,7 +420,10 @@ function getBaseUrl() {
 function updatePublicUrl(slug) {
   const baseUrl = getBaseUrl();
   const publicUrl = `${baseUrl}/index.html?store=${slug}`;
-  document.getElementById('publicStoreUrl').textContent = publicUrl;
+  const el = document.getElementById('publicStoreUrl');
+  if (el) el.textContent = publicUrl;
+  const topBtn = document.getElementById('btnTopOpenMenu');
+  if (topBtn) topBtn.href = publicUrl;
 }
 
 // ============================================
