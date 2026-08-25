@@ -1,40 +1,161 @@
 /**
- * Gerenciamento de Estado Global do Cardápio & Carrinho
- * Compatível com file:// e http://
+ * Gerenciamento de Estado Global do Cardápio & Carrinho - Supabase Version
+ * Compatível com storage síncrono (localStorage) e assíncrono (Supabase)
  */
 
 class StoreState {
   constructor() {
-    this.refreshData();
+    this.store = null;
+    this.categories = [];
+    this.products = [];
+    this.addonGroups = {};
+    this.customer = null;
+    this.listeners = [];
+    this._refreshing = false;
+    this._ready = false;
+    this._readyPromise = null;
 
     this.cart = {
       items: [],
-      orderType: 'delivery', // 'delivery' | 'pickup'
-      neighborhood: this.store.neighborhoods?.[0] || { name: 'Padrão', fee: this.store.default_delivery_fee || 7.00 },
-      paymentMethod: 'pix', // 'pix' | 'card' | 'cash'
-      cashChange: '', // troco para quanto
+      orderType: 'delivery',
+      neighborhood: null,
+      paymentMethod: 'pix',
+      cashChange: '',
       notes: ''
     };
 
-    this.listeners = [];
+    // Inicialização assíncrona
+    this._initAsync();
 
-    // Ouve alterações no storage
+    // Ouve alterações no storage (eventos síncronos)
     if (typeof window !== 'undefined') {
       window.addEventListener('cardapio_data_change', () => {
-        this.refreshData();
+        this.refreshDataSync();
       });
     }
   }
 
-  refreshData() {
+  async _initAsync() {
+    try {
+      await this.refreshData();
+      this._ready = true;
+      this.notify();
+    } catch (err) {
+      console.error('Erro ao inicializar StoreState:', err);
+      // Fallback para dados síncronos
+      this.refreshDataSync();
+      this._ready = true;
+      this.notify();
+    }
+  }
+
+  // Promise que resolve quando estado está pronto
+  ready() {
+    if (this._ready) return Promise.resolve();
+    return new Promise(resolve => {
+      const check = () => {
+        if (this._ready) resolve();
+        else setTimeout(check, 50);
+      };
+      check();
+    });
+  }
+
+  // Refresh síncrono (para eventos de mudança)
+  refreshDataSync() {
+    if (this._refreshing) return;
     const storageEngine = window.storage;
     if (!storageEngine) return;
-    this.store = storageEngine.getStore();
-    this.categories = storageEngine.getCategories();
-    this.products = storageEngine.getProducts();
-    this.addonGroups = storageEngine.getAddonGroups();
-    this.customer = storageEngine.getCustomerProfile();
-    this.notify();
+    
+    // Tenta pegar dados do cache local primeiro
+    try {
+      if (storageEngine.localCache || storageEngine.useLocalFallback) {
+        this.store = storageEngine.getStore();
+        this.categories = storageEngine.getCategories();
+        this.products = storageEngine.getProducts();
+        this.addonGroups = storageEngine.getAddonGroups();
+        this.customer = storageEngine.getCustomerProfile();
+      } else {
+        // Supabase: usa cache local se disponível, senão busca
+        this._refreshFromStorage();
+      }
+      this._ready = true;
+      this.notify();
+    } catch (err) {
+      console.warn('refreshDataSync fallback:', err);
+    }
+  }
+
+  // Refresh assíncrono (busca do Supabase)
+  async refreshData() {
+    if (this._refreshing) return;
+    this._refreshing = true;
+    
+    const storageEngine = window.storage;
+    if (!storageEngine) {
+      this._refreshing = false;
+      return;
+    }
+
+    try {
+      // Se for Supabase, busca dados
+      if (!storageEngine.useLocalFallback && storageEngine.storeId) {
+        const [store, categories, products, addonGroups] = await Promise.all([
+          storageEngine.getStore(),
+          storageEngine.getCategories(),
+          storageEngine.getProducts(),
+          storageEngine.getAddonGroups()
+        ]);
+        this.store = store || this.store;
+        this.categories = categories || this.categories;
+        this.products = products || this.products;
+        this.addonGroups = addonGroups || this.addonGroups;
+      } else {
+        // Fallback local
+        this.store = storageEngine.getStore();
+        this.categories = storageEngine.getCategories();
+        this.products = storageEngine.getProducts();
+        this.addonGroups = storageEngine.getAddonGroups();
+      }
+      this.customer = storageEngine.getCustomerProfile();
+      
+      // Default neighborhood
+      if (!this.cart.neighborhood && this.store) {
+        this.cart.neighborhood = this.store.neighborhoods?.[0] || { 
+          name: 'Padrão', 
+          fee: this.store.default_delivery_fee || 7.00 
+        };
+      }
+      
+      this._ready = true;
+      this.notify();
+    } catch (err) {
+      console.error('refreshData error:', err);
+      // Fallback silencioso
+      this.refreshDataSync();
+    } finally {
+      this._refreshing = false;
+    }
+  }
+
+  async _refreshFromStorage() {
+    const storageEngine = window.storage;
+    if (!storageEngine) return;
+    
+    try {
+      const [store, categories, products, addonGroups] = await Promise.all([
+        storageEngine.getStore(),
+        storageEngine.getCategories(),
+        storageEngine.getProducts(),
+        storageEngine.getAddonGroups()
+      ]);
+      this.store = store || this.store;
+      this.categories = categories || this.categories;
+      this.products = products || this.products;
+      this.addonGroups = addonGroups || this.addonGroups;
+    } catch (err) {
+      console.warn('_refreshFromStorage failed:', err);
+    }
   }
 
   // --- Subscriptions ---
@@ -64,7 +185,6 @@ class StoreState {
       observation = ''
     } = itemPayload;
 
-    // Se for pizza meio a meio, o preço base é o maior valor entre os dois sabores
     let basePrice = Number(product.price);
     let displayName = product.name;
 
@@ -73,7 +193,6 @@ class StoreState {
       displayName = `Pizza ½ ${product.name.replace('Pizza ', '')} + ½ ${secondFlavor.name.replace('Pizza ', '')}`;
     }
 
-    // Aplica diferença de tamanho
     let unitPrice = basePrice;
     if (size && typeof size.price_diff === 'number') {
       unitPrice += size.price_diff;
@@ -83,7 +202,6 @@ class StoreState {
       }
     }
 
-    // Aplica bordas e adicionais
     if (crust && crust.price) {
       unitPrice += Number(crust.price);
     }
