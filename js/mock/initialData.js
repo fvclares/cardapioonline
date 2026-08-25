@@ -7,7 +7,7 @@ const INITIAL_STORE_DATA = {
   id: 'store_bella_massa',
   name: 'Pizzaria Bella Massa',
   slug: 'bella-massa',
-  phone: '5511999998888',
+  phone: '5591982276763',
   phone_display: '(11) 99999-8888',
   description: 'Pizzas artesanais assadas em forno a lenha com fermentação natural e ingredientes premium.',
   logo: 'images/img_042.jpg',
