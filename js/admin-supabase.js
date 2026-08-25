@@ -615,7 +615,7 @@ async function renderProducts() {
     return `
       <div class="item-row">
         <div class="item-main">
-          <img src="${prod.image_url || 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=150&q=80'}" class="item-thumb" alt="${prod.name}" />
+          ${prod.image_url ? `<img src="${prod.image_url}" class="item-thumb" alt="${prod.name}" />` : ''}
           <div>
             <div class="item-info-title">${prod.name} ${!prod.available ? '<span class="badge badge-closed">Pausado</span>' : ''}</div>
             <div class="item-info-meta">
