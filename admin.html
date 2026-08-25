@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Painel da Pizzaria — Gestão do Cardápio</title>
+  <meta name="theme-color" content="#0e1117" />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/admin.css" />
+</head>
+<body>
+
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="admin-brand">
+        <span class="admin-brand-icon">🍕</span>
+        <div>
+          <div class="admin-brand-title" id="sidebarStoreName">Pizzaria Admin</div>
+          <div class="admin-brand-sub">Painel do Lojista</div>
+        </div>
+      </div>
+
+      <nav class="admin-nav">
+        <button class="admin-nav-item active" data-tab="tab-settings">
+          <span class="admin-nav-icon">⚙️</span>
+          <span>Configurações</span>
+        </button>
+        <button class="admin-nav-item" data-tab="tab-categories">
+          <span class="admin-nav-icon">📂</span>
+          <span>Categorias</span>
+        </button>
+        <button class="admin-nav-item" data-tab="tab-products">
+          <span class="admin-nav-icon">🍕</span>
+          <span>Produtos & Preços</span>
+        </button>
+        <button class="admin-nav-item" data-tab="tab-orders">
+          <span class="admin-nav-icon">📋</span>
+          <span>Histórico de Pedidos</span>
+        </button>
+        <button class="admin-nav-item" data-tab="tab-share">
+          <span class="admin-nav-icon">🔗</span>
+          <span>Link da Loja</span>
+        </button>
+      </nav>
+
+      <div class="admin-sidebar-footer">
+        <a href="index.html" target="_blank" class="btn btn-secondary btn-sm btn-block" style="display: flex; align-items: center; justify-content: center; gap: 0.4rem;">
+          👁️ Ver Cardápio Público
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+      <header class="admin-topbar">
+        <h1 class="admin-page-title" id="pageTitle">Configurações da Loja</h1>
+        <div class="admin-topbar-actions">
+          <a href="index.html" target="_blank" class="btn btn-primary btn-sm">
+            🔗 Abrir Cardápio
+          </a>
+        </div>
+      </header>
+
+      <div class="admin-content">
+
+        <!-- TAB 1: Configurações da Loja -->
+        <div class="tab-panel active" id="tab-settings">
+          <form id="storeSettingsForm" class="admin-card">
+            <div class="admin-card-header">
+              <h2 class="admin-card-title">🏪 Informações Principais da Pizzaria</h2>
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <label class="switch-label">
+                  <input type="checkbox" id="storeStatusInput" class="switch-input" />
+                  <span class="switch-slider"></span>
+                  <span id="storeStatusText" style="font-weight: 700; font-size: 0.85rem;">Aberto</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="form-grid form-grid-2" style="margin-bottom: 1.25rem;">
+              <div class="form-group">
+                <label class="form-label">Nome da Pizzaria *</label>
+                <input type="text" id="storeNameInput" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">WhatsApp para Receber os Pedidos *</label>
+                <input type="tel" id="storePhoneInput" placeholder="5511999998888" required />
+                <span class="form-help">DDD + Número (ex: 5511999998888). Os pedidos serão enviados para cá.</span>
+              </div>
+            </div>
+
+            <div class="form-grid form-grid-2" style="margin-bottom: 1.25rem;">
+              <div class="form-group">
+                <label class="form-label">Endereço da Loja</label>
+                <input type="text" id="storeAddressInput" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Horário de Atendimento</label>
+                <input type="text" id="storeHoursInput" placeholder="Ex: Terça a Domingo das 18h30 às 23h30" />
+              </div>
+            </div>
+
+            <div class="form-grid form-grid-2" style="margin-bottom: 1.25rem;">
+              <div class="form-group">
+                <label class="form-label">Taxa Padrão de Entrega (R$)</label>
+                <input type="number" step="0.50" id="storeDeliveryFeeInput" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Pedido Mínimo (R$)</label>
+                <input type="number" step="1.00" id="storeMinOrderInput" />
+              </div>
+            </div>
+
+            <div class="form-grid form-grid-2" style="margin-bottom: 1.5rem;">
+              <div class="form-group">
+                <label class="form-label">URL da Imagem da Logo</label>
+                <input type="url" id="storeLogoInput" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">URL da Imagem de Capa</label>
+                <input type="url" id="storeCoverInput" />
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+              <button type="submit" class="btn btn-primary">
+                💾 Salvar Alterações
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- TAB 2: Categorias -->
+        <div class="tab-panel" id="tab-categories">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h2 class="admin-card-title">📂 Categorias do Cardápio</h2>
+              <button class="btn btn-primary btn-sm" id="btnNewCategory">
+                + Nova Categoria
+              </button>
+            </div>
+
+            <div id="categoriesListContainer"></div>
+          </div>
+        </div>
+
+        <!-- TAB 3: Produtos & Preços -->
+        <div class="tab-panel" id="tab-products">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h2 class="admin-card-title">🍕 Catálogo de Produtos & Preços</h2>
+              <button class="btn btn-primary btn-sm" id="btnNewProduct">
+                + Novo Produto
+              </button>
+            </div>
+
+            <div style="margin-bottom: 1.25rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+              <select id="filterProductCategory" style="max-width: 250px;">
+                <option value="">Todas as Categorias</option>
+              </select>
+              <input type="text" id="filterProductSearch" placeholder="Buscar produto por nome..." style="max-width: 320px;" />
+            </div>
+
+            <div id="productsListContainer"></div>
+          </div>
+        </div>
+
+        <!-- TAB 4: Histórico de Pedidos -->
+        <div class="tab-panel" id="tab-orders">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h2 class="admin-card-title">📋 Pedidos Despachados para WhatsApp</h2>
+              <span id="orderCountBadge" class="badge badge-primary">0 pedidos</span>
+            </div>
+
+            <div id="ordersListContainer"></div>
+          </div>
+        </div>
+
+        <!-- TAB 5: Link de Divulgação -->
+        <div class="tab-panel" id="tab-share">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h2 class="admin-card-title">🔗 Link Exclusivo da Loja</h2>
+            </div>
+
+            <p style="color: var(--text-secondary); margin-bottom: 1.25rem;">
+              Divulgue este link no seu <strong>WhatsApp Business</strong>, no botão da sua <strong>Bio do Instagram</strong> ou em mensagens automáticas para seus clientes pedirem com rapidez.
+            </p>
+
+            <div class="share-link-box">
+              <div style="font-weight: 700; font-size: 1.05rem;">Seu Cardápio Digital:</div>
+              <div class="share-url-display" id="publicStoreUrl">...</div>
+              
+              <div style="display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap;">
+                <button class="btn btn-primary" id="btnCopyStoreLink">
+                  📋 Copiar Link
+                </button>
+                <a href="index.html" target="_blank" class="btn btn-secondary">
+                  🚀 Testar como Cliente
+                </a>
+              </div>
+            </div>
+
+            <div style="border-top: 1px solid var(--border); padding-top: 1.5rem; margin-top: 1.5rem;">
+              <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem;">⚙️ Restaurar Demonstração</h4>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+                Deseja restaurar os produtos e configurações padrão da Pizzaria Bella Massa?
+              </p>
+              <button class="btn btn-secondary btn-sm" id="btnResetData">
+                🔄 Restaurar Dados Padrão
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal: Nova / Editar Categoria -->
+  <div id="categoryModalBackdrop" class="modal-backdrop">
+    <div class="modal-sheet" style="max-width: 450px;">
+      <div class="modal-header">
+        <div class="modal-title" id="categoryModalTitle">Categoria</div>
+        <button class="modal-close-btn" id="btnCloseCategoryModal">✕</button>
+      </div>
+      <form id="categoryForm">
+        <div class="modal-body">
+          <input type="hidden" id="catEditId" />
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label">Nome da Categoria *</label>
+            <input type="text" id="catNameInput" placeholder="Ex: 🍕 Pizzas Especiais" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ordem de Exibição</label>
+            <input type="number" id="catOrderInput" value="1" min="1" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btnCancelCategory">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Categoria</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Novo / Editar Produto -->
+  <div id="productModalBackdrop" class="modal-backdrop">
+    <div class="modal-sheet" style="max-width: 550px;">
+      <div class="modal-header">
+        <div class="modal-title" id="productModalTitle">Produto</div>
+        <button class="modal-close-btn" id="btnCloseProductModal">✕</button>
+      </div>
+      <form id="productForm">
+        <div class="modal-body">
+          <input type="hidden" id="prodEditId" />
+          
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label">Nome do Produto *</label>
+            <input type="text" id="prodNameInput" placeholder="Ex: Pizza Calabresa Especial" required />
+          </div>
+
+          <div class="form-grid form-grid-2" style="margin-bottom: 1rem;">
+            <div class="form-group">
+              <label class="form-label">Categoria *</label>
+              <select id="prodCategorySelect" required></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Preço Base (R$) *</label>
+              <input type="number" step="0.50" id="prodPriceInput" placeholder="48.00" required />
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label">Descrição / Ingredientes</label>
+            <textarea id="prodDescriptionInput" rows="2" placeholder="Molho caseiro, mussarela especial, calabresa..." style="resize: none;"></textarea>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label">URL da Imagem</label>
+            <input type="url" id="prodImageInput" placeholder="https://..." />
+          </div>
+
+          <div style="background: var(--bg-input); padding: 0.85rem; border-radius: var(--radius-md); border: 1px solid var(--border); margin-bottom: 1rem;">
+            <div class="form-label" style="margin-bottom: 0.5rem;">Opções de Personalização:</div>
+            <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; margin-bottom: 0.4rem; cursor: pointer;">
+              <input type="checkbox" id="prodHasCrustsInput" style="width: auto;" />
+              Permite escolher Borda Recheada (Catupiry, Cheddar, etc.)
+            </label>
+            <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; cursor: pointer;">
+              <input type="checkbox" id="prodHasExtrasInput" style="width: auto;" />
+              Permite escolher Adicionais Extras (Bacon, Queijo extra, etc.)
+            </label>
+          </div>
+
+          <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer;">
+            <input type="checkbox" id="prodAvailableInput" checked style="width: auto;" />
+            Produto Disponível para Venda
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btnCancelProduct">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Produto</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scripts Universais (Funcionam em file:// e em http://) -->
+  <script src="js/mock/initialData.js"></script>
+  <script src="js/state/storage.js"></script>
+  <script src="js/services/customer.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>
