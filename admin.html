@@ -254,6 +254,27 @@
             </div>
 
             <div style="border-top: 1px solid var(--border); padding-top: 1.5rem; margin-top: 1.5rem;">
+              <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem;">📦 Publicar Alterações (GitHub Pages)</h4>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+                As edições ficam salvas no navegador. Para publicar no site online:
+              </p>
+              <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+                <button class="btn btn-primary btn-sm" id="btnExportData">
+                  📥 Baixar Dados Atualizados (JSON)
+                </button>
+                <label class="btn btn-secondary btn-sm" style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; height: 38px; padding: 0 1rem;">
+                  📤 Importar JSON
+                  <input type="file" id="importJsonFile" accept=".json" style="display: none;" />
+                </label>
+              </div>
+              <ol style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.8; padding-left: 1.25rem; max-width: 500px;">
+                <li>Clique em <strong>"Baixar Dados Atualizados"</strong> → salva arquivo <code>cardapio-data.json</code></li>
+                <li>No GitHub, vá em <code>js/mock/initialData.js</code> → substitua o conteúdo pelo JSON baixado (ou crie <code>data/store.json</code>)</li>
+                <li>Commit + Push → GitHub Actions publica automaticamente em ~2 min</li>
+              </ol>
+            </div>
+
+            <div style="border-top: 1px solid var(--border); padding-top: 1.5rem; margin-top: 1.5rem;">
               <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem;">⚙️ Restaurar Demonstração</h4>
               <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
                 Deseja restaurar os produtos e configurações padrão da Pizzaria Bella Massa?
@@ -445,6 +466,59 @@
       clearAuth();
       showLogin('Você saiu do painel.');
     });
+
+    // Export/Import handlers (após admin carregado)
+    setTimeout(() => {
+      const exportBtn = document.getElementById('btnExportData');
+      const importFile = document.getElementById('importJsonFile');
+      if (exportBtn) exportBtn.addEventListener('click', exportData);
+      if (importFile) importFile.addEventListener('change', importData);
+    }, 500);
+
+    function exportData() {
+      const storage = window.storage;
+      if (!storage) return alert('Storage não carregado');
+
+      const data = {
+        store: storage.getStore(),
+        categories: storage.getCategories(),
+        products: storage.getProducts(),
+        addonGroups: storage.getAddonGroups(),
+        exportedAt: new Date().toISOString(),
+        version: '1.0'
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cardapio-data-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      alert('✅ Arquivo JSON baixado!\n\nPróximos passos:\n1. No GitHub, edite js/mock/initialData.js\n2. Substitua pelo conteúdo do arquivo\n3. Commit + Push → deploy automático');
+    }
+
+    function importData(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const data = JSON.parse(evt.target.result);
+          const storage = window.storage;
+          if (data.store) storage.saveStore(data.store);
+          if (data.categories) storage.saveCategories(data.categories);
+          if (data.products) storage.saveProducts(data.products);
+          if (data.addonGroups) storage.saveAddonGroups(data.addonGroups);
+          alert('✅ Dados importados! Recarregue a página.');
+          location.reload();
+        } catch (err) {
+          alert('❌ Erro ao importar: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    }
   </script>
 
   <!-- Scripts Universais (Funcionam em file:// e em http://) -->

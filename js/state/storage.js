@@ -141,6 +141,12 @@ class StorageEngine {
     }
   }
 
+  saveAddonGroups(addonGroups) {
+    this.setItem(STORAGE_KEYS.ADDONS, JSON.stringify(addonGroups));
+    this.emitChange('addons_updated', addonGroups);
+    return addonGroups;
+  }
+
   // --- Customer Recognition & Token ---
   getCustomerToken() {
     let token = this.getItem(STORAGE_KEYS.CUSTOMER_TOKEN);
