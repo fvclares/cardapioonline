@@ -53,6 +53,12 @@
     .toast.success { border-color: var(--status-open); }
     .toast.error { border-color: var(--status-closed); }
     .toast.info { border-color: var(--primary); }
+    .invite-status { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
+    .invite-status.pending { background: #fbbf24; color: #78350f; }
+    .invite-status.accepted { background: #34d399; color: #064e3b; }
+    .invite-status.expired { background: #9ca3af; color: #374151; }
+    .invite-status.revoked { background: #f87171; color: #7f1d1d; }
+    .invite-link-box { background: var(--bg-input); border: 1px dashed var(--border); border-radius: var(--radius-md); padding: 0.75rem 1rem; margin-top: 0.5rem; word-break: break-all; font-size: 0.8rem; color: var(--primary); font-family: monospace; }
   </style>
 </head>
 <body>
@@ -68,8 +74,34 @@
   <div class="auth-gate" id="authGate" role="dialog" aria-modal="true" aria-labelledby="authTitle">
     <div class="auth-card">
       <h1 id="authTitle">🍕 Cardápio Online</h1>
-      <p>Painel administrativo multi-loja. Faça login para gerenciar sua pizzaria.</p>
-      
+      <p id="authSubtitle">Painel administrativo multi-loja. Faça login para gerenciar sua pizzaria.</p>
+
+      <!-- Form: Cadastro por Convite (quando ?invite=TOKEN) -->
+      <form class="auth-form" id="inviteSignupForm" style="display: none;">
+        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-md); padding: 0.75rem; margin-bottom: 0.5rem;">
+          <span style="font-size: 0.85rem; font-weight: 600; color: var(--status-open);">✉️ Você foi convidado!</span>
+          <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0.25rem 0 0 0;" id="inviteStoreHint"></p>
+        </div>
+        <label style="display: flex; flex-direction: column; gap: 0.4rem;">
+          <span style="font-size: 0.85rem; font-weight: 600;">📧 E-mail</span>
+          <input type="email" class="auth-input" id="inviteSignupEmail" placeholder="seu@email.com" required autocomplete="email" />
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 0.4rem;">
+          <span style="font-size: 0.85rem; font-weight: 600;">👤 Nome Completo</span>
+          <input type="text" class="auth-input" id="inviteSignupName" placeholder="Seu nome" required />
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 0.4rem;">
+          <span style="font-size: 0.85rem; font-weight: 600;">🔒 Senha</span>
+          <input type="password" class="auth-input" id="inviteSignupPassword" placeholder="Mínimo 6 caracteres" required minlength="6" autocomplete="new-password" />
+        </label>
+        <button type="submit" class="auth-btn" id="inviteSignupBtn">
+          🚀 Criar Conta
+        </button>
+        <div class="auth-error" id="inviteSignupError" aria-live="polite"></div>
+        <input type="hidden" id="inviteTokenValue" />
+      </form>
+
+      <!-- Form: Login normal (Magic Link) -->
       <form class="auth-form" id="magicLinkForm">
         <label style="display: flex; flex-direction: column; gap: 0.4rem;">
           <span style="font-size: 0.85rem; font-weight: 600;">📧 Seu e-mail</span>
@@ -82,7 +114,7 @@
         <div class="auth-success" id="authSuccess" aria-live="polite"></div>
       </form>
 
-      <div class="auth-divider">ou</div>
+      <div class="auth-divider" id="authDivider">ou</div>
 
       <form class="auth-form" id="passwordForm" style="display: none;">
         <label style="display: flex; flex-direction: column; gap: 0.4rem;">
@@ -97,7 +129,7 @@
         <div class="auth-error" id="passwordError" aria-live="polite"></div>
       </form>
 
-      <div class="auth-hint">
+      <div class="auth-hint" id="authHint">
         <button type="button" id="toggleAuthMode" style="background: none; border: none; color: var(--primary); font: inherit; cursor: pointer; text-decoration: underline;">
           Alternar para login com senha
         </button>
@@ -138,6 +170,10 @@
         <button class="admin-nav-item" data-tab="tab-share">
           <span class="admin-nav-icon">🔗</span>
           <span>Link da Loja</span>
+        </button>
+        <button class="admin-nav-item" data-tab="tab-invites" id="navTabInvites" style="display: none;">
+          <span class="admin-nav-icon">✉️</span>
+          <span>Convites</span>
         </button>
       </nav>
 
@@ -361,6 +397,67 @@
             </div>
           </div>
         </div>
+
+        <!-- TAB 6: Convites (Superadmin) -->
+        <div class="tab-panel" id="tab-invites">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h2 class="admin-card-title">✉️ Gerenciar Convites</h2>
+              <button class="btn btn-primary btn-sm" id="btnNewInvite">
+                + Novo Convite
+              </button>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 1.25rem; font-size: 0.9rem;">
+              Envie convites por e-mail para novas pizzarias. O convite gera um link de cadastro com senha.
+            </p>
+            <div id="invitesListContainer"></div>
+          </div>
+        </div>
+
+        <!-- Panel: Criar Loja (primeiro login) -->
+        <div class="tab-panel" id="tab-create-store">
+          <div class="admin-card" style="max-width: 600px; margin: 2rem auto;">
+            <div class="admin-card-header">
+              <h2 class="admin-card-title">🏪 Criar Sua Loja</h2>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">
+              Bem-vindo! Para começar, configure os dados básicos da sua pizzaria.
+            </p>
+            <form id="createStoreForm">
+              <div class="form-grid form-grid-2" style="margin-bottom: 1.25rem;">
+                <div class="form-group">
+                  <label class="form-label">Nome da Pizzaria *</label>
+                  <input type="text" id="createStoreName" placeholder="Ex: Pizzaria Bella Massa" required />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Slug (URL) *</label>
+                  <input type="text" id="createStoreSlug" placeholder="bella-massa" required pattern="^[a-z0-9-]+$" />
+                  <span class="form-help">URL amigável. Ex: bella-massa</span>
+                </div>
+              </div>
+              <div class="form-grid form-grid-2" style="margin-bottom: 1.25rem;">
+                <div class="form-group">
+                  <label class="form-label">WhatsApp para Pedidos *</label>
+                  <input type="tel" id="createStorePhone" placeholder="5511999998888" required />
+                  <span class="form-help">DDD + Número (ex: 5511999998888)</span>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Telefone Exibição</label>
+                  <input type="text" id="createStorePhoneDisplay" placeholder="(11) 99999-8888" />
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom: 1.5rem;">
+                <label class="form-label">Endereço</label>
+                <input type="text" id="createStoreAddress" placeholder="Av. Paulista, 1000 - São Paulo" />
+              </div>
+              <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button type="submit" class="btn btn-primary">
+                  🚀 Criar Loja
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       </div>
     </main>
   </div>
@@ -456,23 +553,42 @@
     </div>
   </div>
 
-  <!-- Scripts (Module) -->
-  <script type="module">
-    import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi } from './js/lib/supabase.js';
-    import { storage } from './js/state/storage-supabase.js';
+  <!-- Modal: Novo Convite -->
+  <div id="inviteModalBackdrop" class="modal-backdrop">
+    <div class="modal-sheet" style="max-width: 480px;">
+      <div class="modal-header">
+        <div class="modal-title">✉️ Enviar Convite</div>
+        <button class="modal-close-btn" id="btnCloseInviteModal">✕</button>
+      </div>
+      <form id="inviteForm">
+        <div class="modal-body">
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label">E-mail do Convidado *</label>
+            <input type="email" id="inviteEmailInput" placeholder="pizzaria@email.com" required />
+          </div>
+          <div class="form-grid form-grid-2" style="margin-bottom: 1rem;">
+            <div class="form-group">
+              <label class="form-label">Nome da Loja (opcional)</label>
+              <input type="text" id="inviteStoreNameInput" placeholder="Pizzaria Bella Massa" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Slug da Loja (opcional)</label>
+              <input type="text" id="inviteStoreSlugInput" placeholder="bella-massa" pattern="^[a-z0-9-]*$" />
+            </div>
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+            O convite expira em 7 dias. O convidado receberá um link para criar sua senha.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btnCancelInvite">Cancelar</button>
+          <button type="submit" class="btn btn-primary">✉️ Criar e Copiar Link</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-    // Expose para compatibilidade
-    window.supabase = supabase;
-    window.auth = auth;
-    window.storeApi = storeApi;
-    window.categoriesApi = categoriesApi;
-    window.productsApi = productsApi;
-    window.addonGroupsApi = addonGroupsApi;
-    window.neighborhoodsApi = neighborhoodsApi;
-    window.ordersApi = ordersApi;
-    window.settingsApi = settingsApi;
-    window.storageApi = storageApi;
-  </script>
-  <script type="module" src="js/admin-supabase.js"></script>
+  <!-- Scripts (Module) -->
+  <script type="module" src="js/admin-supabase.js?v=3"></script>
 </body>
 </html>

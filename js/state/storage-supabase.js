@@ -4,6 +4,8 @@
  * Compatível com a API anterior (window.storage)
  */
 
+import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, neighborhoodsApi, ordersApi, settingsApi } from '../lib/supabase.js';
+
 class SupabaseStorageEngine {
   constructor() {
     this.storeId = null;
@@ -20,7 +22,6 @@ class SupabaseStorageEngine {
     };
   }
 
-  // Inicializa com store_id (obtido via auth ou slug)
   async init(storeId) {
     this.storeId = storeId;
     if (!storeId) {
@@ -29,11 +30,7 @@ class SupabaseStorageEngine {
       return this.initLocalFallback();
     }
     
-    // Testa conexão e pré-carrega todos os dados
     try {
-      const { supabase } = await import('../lib/supabase.js');
-      const { storeApi, categoriesApi, productsApi, addonGroupsApi, neighborhoodsApi, settingsApi } = await import('../lib/supabase.js');
-      
       const [storeResult, categoriesResult, productsResult, addonsResult, neighborhoodsResult, settingsResult] = await Promise.all([
         storeApi.getById(storeId),
         categoriesApi.list(storeId),
@@ -48,7 +45,6 @@ class SupabaseStorageEngine {
       if (productsResult.error) throw productsResult.error;
       if (addonsResult.error) throw addonsResult.error;
 
-      // Cache todos os dados localmente para acesso síncrono
       this._dataCache.store = storeResult.data;
       this._dataCache.categories = categoriesResult.data || [];
       this._dataCache.products = productsResult.data || [];
@@ -61,7 +57,7 @@ class SupabaseStorageEngine {
       this._dataCache.neighborhoods = neighborhoodsResult.data || [];
       this._dataCache.settings = settingsResult.data || {};
 
-      console.log('✅ SupabaseStorageEngine inicializado com dados pré-carregados para store:', storeId);
+      console.log('✅ SupabaseStorageEngine inicializado para store:', storeId);
       this.emitChange('data_ready', this._dataCache);
     } catch (err) {
       console.warn('⚠️ Falha ao conectar Supabase, usando fallback local:', err.message);
@@ -70,7 +66,6 @@ class SupabaseStorageEngine {
     }
   }
 
-  // Fallback para localStorage (compatibilidade)
   initLocalFallback() {
     this.useLocalFallback = true;
     const STORAGE_KEYS = {
@@ -82,18 +77,15 @@ class SupabaseStorageEngine {
     };
 
     this.getItem = (key) => {
-      try {
-        return localStorage.getItem(key);
-      } catch { return this.localCache[key] || null; }
+      try { return localStorage.getItem(key); }
+      catch { return this.localCache[key] || null; }
     };
 
     this.setItem = (key, value) => {
-      try {
-        localStorage.setItem(key, value);
-      } catch { this.localCache[key] = value; }
+      try { localStorage.setItem(key, value); }
+      catch { this.localCache[key] = value; }
     };
 
-    // Carrega dados iniciais se vazio
     if (!this.getItem(STORAGE_KEYS.STORE)) {
       this.setItem(STORAGE_KEYS.STORE, JSON.stringify(window.INITIAL_STORE_DATA || {}));
     }
@@ -113,28 +105,12 @@ class SupabaseStorageEngine {
     console.log('📦 Usando localStorage fallback');
   }
 
-  // --- Store Data ---
   getStore() {
     if (this.useLocalFallback) {
       return JSON.parse(this.getItem('cardapio_store_data') || '{}');
     }
-    // Retorna cache síncrono
     if (this._dataCache.store) return this._dataCache.store;
-    // Fallback assíncrono se cache vazio
-    console.warn('Cache de store vazio, buscando do Supabase...');
-    this._fetchStoreAsync();
     return {};
-  }
-
-  _fetchStoreAsync() {
-    import('../lib/supabase.js').then(({ storeApi }) => {
-      storeApi.getById(this.storeId).then(({ data, error }) => {
-        if (!error && data) {
-          this._dataCache.store = data;
-          this.emitChange('store_updated', data);
-        }
-      });
-    });
   }
 
   async saveStore(storeData) {
@@ -143,7 +119,6 @@ class SupabaseStorageEngine {
       this.emitChange('store_updated', storeData);
       return storeData;
     }
-    const { storeApi } = await import('../lib/supabase.js');
     const { data, error } = await storeApi.update(this.storeId, storeData);
     if (error) throw error;
     this._dataCache.store = data;
@@ -151,26 +126,11 @@ class SupabaseStorageEngine {
     return data;
   }
 
-  // --- Categories ---
   getCategories() {
     if (this.useLocalFallback) {
       return JSON.parse(this.getItem('cardapio_categories') || '[]');
     }
-    if (this._dataCache.categories) return this._dataCache.categories;
-    console.warn('Cache de categories vazio, buscando do Supabase...');
-    this._fetchCategoriesAsync();
-    return [];
-  }
-
-  _fetchCategoriesAsync() {
-    import('../lib/supabase.js').then(({ categoriesApi }) => {
-      categoriesApi.list(this.storeId).then(({ data, error }) => {
-        if (!error && data) {
-          this._dataCache.categories = data;
-          this.emitChange('categories_updated', data);
-        }
-      });
-    });
+    return this._dataCache.categories || [];
   }
 
   async saveCategories(categories) {
@@ -184,29 +144,14 @@ class SupabaseStorageEngine {
     return categories;
   }
 
-  // --- Products ---
   getProducts() {
     if (this.useLocalFallback) {
       return JSON.parse(this.getItem('cardapio_products') || '[]');
     }
-    if (this._dataCache.products) return this._dataCache.products;
-    console.warn('Cache de products vazio, buscando do Supabase...');
-    this._fetchProductsAsync();
-    return [];
+    return this._dataCache.products || [];
   }
 
-  _fetchProductsAsync() {
-    import('../lib/supabase.js').then(({ productsApi }) => {
-      productsApi.listAdmin(this.storeId).then(({ data, error }) => {
-        if (!error && data) {
-          this._dataCache.products = data;
-          this.emitChange('products_updated', data);
-        }
-      });
-    });
-  }
-
-getProductById(id) {
+  getProductById(id) {
     if (this.useLocalFallback) {
       const products = JSON.parse(this.getItem('cardapio_products') || '[]');
       return products.find(p => p.id === id) || null;
@@ -214,12 +159,6 @@ getProductById(id) {
     if (this._dataCache.products) {
       return this._dataCache.products.find(p => p.id === id) || null;
     }
-    // Fallback: busca assíncrona
-    import('../lib/supabase.js').then(({ productsApi }) => {
-      productsApi.getById(id).then(({ data }) => {
-        if (data) this.emitChange('products_updated', this._dataCache.products);
-      });
-    });
     return null;
   }
 
@@ -234,14 +173,11 @@ getProductById(id) {
     return products;
   }
 
-  // --- Addon Groups ---
   getAddonGroups() {
     if (this.useLocalFallback) {
       return JSON.parse(this.getItem('cardapio_addon_groups') || '{}');
     }
-    if (this._dataCache.addonGroups) return this._dataCache.addonGroups;
-    console.warn('Cache de addonGroups vazio');
-    return {};
+    return this._dataCache.addonGroups || {};
   }
 
   async saveAddonGroups(addonGroups) {
@@ -255,30 +191,20 @@ getProductById(id) {
     return addonGroups;
   }
 
-  // --- Neighborhoods ---
   getNeighborhoods() {
-    if (this.useLocalFallback) {
-      return [];
-    }
-    if (this._dataCache.neighborhoods) return this._dataCache.neighborhoods;
-    return [];
+    if (this.useLocalFallback) return [];
+    return this._dataCache.neighborhoods || [];
   }
 
-  // --- Settings ---
   getSettings() {
-    if (this.useLocalFallback) {
-      return {};
-    }
-    if (this._dataCache.settings) return this._dataCache.settings;
-    return {};
+    if (this.useLocalFallback) return {};
+    return this._dataCache.settings || {};
   }
 
-  // --- Orders ---
   async getOrders() {
     if (this.useLocalFallback) {
       return JSON.parse(this.getItem('cardapio_orders') || '[]');
     }
-    const { ordersApi } = await import('../lib/supabase.js');
     const { data, error } = await ordersApi.list(this.storeId);
     if (error) throw error;
     return data;
@@ -292,7 +218,6 @@ getProductById(id) {
       this.emitChange('order_created', order);
       return order;
     }
-    const { ordersApi } = await import('../lib/supabase.js');
     const { data, error } = await ordersApi.create(this.storeId, order);
     if (error) throw error;
     this.emitChange('order_created', data);
@@ -304,7 +229,6 @@ getProductById(id) {
     return orders.length > 0 ? orders[0] : null;
   }
 
-  // --- Reset ---
   async resetDefaults() {
     if (this.useLocalFallback) {
       this.setItem('cardapio_store_data', JSON.stringify(window.INITIAL_STORE_DATA || {}));
@@ -314,11 +238,9 @@ getProductById(id) {
       this.emitChange('reset_all', null);
       return;
     }
-    // No Supabase, reset não é trivial - avisa para usar dashboard
-    console.warn('Reset completo não disponível no Supabase. Use o Dashboard ou recrie a loja.');
+    console.warn('Reset completo não disponível no Supabase.');
   }
 
-  // --- Event System ---
   on(event, callback) {
     if (!this.listeners.has(event)) this.listeners.set(event, []);
     this.listeners.get(event).push(callback);
@@ -335,7 +257,6 @@ getProductById(id) {
     if (this.listeners.has(type)) {
       this.listeners.get(type).forEach(cb => cb(payload));
     }
-    // Também dispara evento global para compatibilidade
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('cardapio_data_change', {
         detail: { type, payload }
@@ -343,51 +264,16 @@ getProductById(id) {
     }
   }
 
-  // Subscribe a pedidos em tempo real
   async subscribeToOrders(callback) {
     if (this.useLocalFallback) return () => {};
-    const { ordersApi } = await import('../lib/supabase.js');
     const subscription = ordersApi.subscribeToNewOrders(this.storeId, callback);
     return () => subscription.unsubscribe();
   }
 }
 
-// Instância global
-window.storage = new SupabaseStorageEngine();
+// Cria instância global
+const storageInstance = new SupabaseStorageEngine();
+window.storage = storageInstance;
 
-// Auto-inicialização: tenta pegar store_id da URL ou auth
-(async () => {
-  // 1. Tenta via URL param (?store=bella-massa)
-  const urlParams = new URLSearchParams(window.location.search);
-  const slug = urlParams.get('store') || urlParams.get('slug');
-  
-  if (slug) {
-    const { storeApi } = await import('../lib/supabase.js');
-    const { data: store } = await storeApi.getBySlug(slug);
-    if (store) {
-      await window.storage.init(store.id);
-      return;
-    }
-  }
-
-  // 2. Tenta via auth (admin logado)
-  const { auth } = await import('../lib/supabase.js');
-  const session = await auth.getSession();
-  if (session?.user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('store_id')
-      .eq('id', session.user.id)
-      .single();
-    if (profile?.store_id) {
-      await window.storage.init(profile.store_id);
-      return;
-    }
-  }
-
-  // 3. Fallback: localStorage
-  console.log('🔄 Inicializando storage com fallback local...');
-  window.storage.initLocalFallback();
-})();
-
-export default window.storage;
+export { storageInstance as storage };
+export default storageInstance;
