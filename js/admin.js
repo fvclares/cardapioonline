@@ -3,6 +3,105 @@
  * Compatível com file:// e http://
  */
 
+// Detecta se está rodando localmente (file://) ou no servidor (http://)
+const IS_LOCAL = window.location.protocol === 'file:';
+const API_BASE = IS_LOCAL ? '' : (window.location.origin + window.location.pathname.replace(/\/[^/]*$/, ''));
+
+async function uploadImage(file) {
+  if (IS_LOCAL) {
+    alert('Upload de imagens só funciona quando acessado via http:// (servidor local).\n\nExecute: npm start\n\nEntão acesse: http://localhost:3000/admin.html');
+    return null;
+  }
+
+  const formData = new FormData();
+  formData.append('image', file);
+
+  try {
+    const response = await fetch('/api/upload-image', {
+      method: 'POST',
+      body: formData
+    });
+
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Erro no upload');
+    }
+
+    return result.url;
+  } catch (err) {
+    console.error('Upload error:', err);
+    alert('Erro ao fazer upload: ' + err.message);
+    return null;
+  }
+}
+
+function setupImageUpload(buttonSelector) {
+  document.querySelectorAll(buttonSelector).forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.dataset.target;
+      const previewId = btn.dataset.preview;
+      const targetInput = document.getElementById(targetId);
+      const previewImg = document.getElementById(previewId);
+      
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'image/jpeg,image/png,image/webp,image/gif';
+      fileInput.style.display = 'none';
+      
+      fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        if (file.size > 5 * 1024 * 1024) {
+          alert('Arquivo muito grande. Máximo 5MB.');
+          return;
+        }
+        
+        btn.disabled = true;
+        btn.textContent = '⏳ Enviando...';
+        
+        const url = await uploadImage(file);
+        
+        if (url) {
+          targetInput.value = url;
+          if (previewImg) {
+            previewImg.src = url;
+            previewImg.style.display = 'block';
+          }
+        }
+        
+        btn.disabled = false;
+        btn.textContent = '📤 Upload';
+      });
+      
+      fileInput.click();
+    });
+  });
+}
+
+function setupImagePreview(inputId, previewId) {
+  const input = document.getElementById(inputId);
+  const preview = document.getElementById(previewId);
+  
+  if (input && preview) {
+    input.addEventListener('input', () => {
+      if (input.value.trim()) {
+        preview.src = input.value.trim();
+        preview.style.display = 'block';
+      } else {
+        preview.style.display = 'none';
+      }
+    });
+    
+    // Trigger inicial
+    if (input.value.trim()) {
+      preview.src = input.value.trim();
+      preview.style.display = 'block';
+    }
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const storage = window.storage;
   const cs = window.customerService;
@@ -53,6 +152,24 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('storeMinOrderInput').value = store.min_order_value || 35.00;
     document.getElementById('storeLogoInput').value = store.logo || '';
     document.getElementById('storeCoverInput').value = store.cover || '';
+
+    // Preview das imagens
+    const logoPreview = document.getElementById('storeLogoPreview');
+    const coverPreview = document.getElementById('storeCoverPreview');
+    
+    if (store.logo) {
+      logoPreview.src = store.logo;
+      logoPreview.style.display = 'block';
+    } else {
+      logoPreview.style.display = 'none';
+    }
+    
+    if (store.cover) {
+      coverPreview.src = store.cover;
+      coverPreview.style.display = 'block';
+    } else {
+      coverPreview.style.display = 'none';
+    }
 
     const isOpen = store.status === 'open';
     statusInput.checked = isOpen;
@@ -307,6 +424,15 @@ document.addEventListener('DOMContentLoaded', () => {
       availInput.checked = true;
     }
 
+    // Atualiza preview da imagem
+    const preview = document.getElementById('prodImagePreview');
+    if (imgInput.value.trim()) {
+      preview.src = imgInput.value.trim();
+      preview.style.display = 'block';
+    } else {
+      preview.style.display = 'none';
+    }
+
     productModalBackdrop.classList.add('active');
   }
 
@@ -453,4 +579,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Inicialização inicial
   loadStoreSettings();
+  
+  // Setup upload de imagens
+  setupImageUpload('.btn-upload');
+  setupImagePreview('storeLogoInput', 'storeLogoPreview');
+  setupImagePreview('storeCoverInput', 'storeCoverPreview');
+  setupImagePreview('prodImageInput', 'prodImagePreview');
 });
