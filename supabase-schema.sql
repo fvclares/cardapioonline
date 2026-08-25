@@ -106,6 +106,7 @@ create table public.products (
   has_extras boolean not null default true,
   available boolean not null default true,
   display_order int not null default 1,
+  codigo int check (codigo between 1 and 999),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -114,6 +115,7 @@ create index idx_products_store on public.products(store_id);
 create index idx_products_category on public.products(category_id);
 create index idx_products_store_available on public.products(store_id, available);
 create index idx_products_store_category_order on public.products(store_id, category_id, display_order);
+create unique index idx_products_store_codigo on public.products(store_id, codigo) where codigo is not null;
 
 create trigger update_products_updated_at
   before update on public.products

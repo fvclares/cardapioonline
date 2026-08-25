@@ -23,7 +23,8 @@ const whatsappService = {
     // Itens do Pedido
     lines.push(`*ITENS DO PEDIDO:*`);
     order.items.forEach((item, index) => {
-      lines.push(`${item.quantity}x *${item.productName}*`);
+      const codigoStr = item.productCodigo ? `#${String(item.productCodigo).padStart(3,'0')} ` : '';
+      lines.push(`${item.quantity}x *${codigoStr}${item.productName}*`);
       
       if (item.crust && item.crust.name && item.crust.price > 0) {
         lines.push(`   - Borda: ${item.crust.name} (+ ${cs ? cs.formatCurrency(item.crust.price) : 'R$ ' + item.crust.price})`);

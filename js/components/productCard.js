@@ -5,14 +5,16 @@
 
 function renderProductSections(container, searchQuery = '', onSelectProduct) {
   const categories = (window.appState.categories || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
-  const products = (window.appState.products || []).filter(p => p.available !== false);
+  const products = (window.appState.products || []).filter(p => p.available !== false).slice().sort((a,b)=> (a.codigo||9999)-(b.codigo||9999) || (a.order||0)-(b.order||0));
   const cs = window.customerService;
 
   let filteredProducts = products;
   if (searchQuery) {
+    const q = searchQuery.toLowerCase();
     filteredProducts = products.filter(p => 
-      p.name.toLowerCase().includes(searchQuery) ||
-      (p.description && p.description.toLowerCase().includes(searchQuery))
+      p.name.toLowerCase().includes(q) ||
+      (p.description && p.description.toLowerCase().includes(q)) ||
+      String(p.codigo||'').includes(q)
     );
   }
 
@@ -39,7 +41,7 @@ function renderProductSections(container, searchQuery = '', onSelectProduct) {
             <div class="product-card" data-product-id="${product.id}">
               <div class="product-card-body">
                 <div>
-                  <h3 class="product-title">${product.name}</h3>
+                  <h3 class="product-title">${product.codigo ? `<span style="color:var(--primary); font-weight:800;">#${String(product.codigo).padStart(3,'0')}</span> ` : ''}${product.name}</h3>
                   <p class="product-description">${product.description || ''}</p>
                 </div>
                 <div class="product-price-bar">

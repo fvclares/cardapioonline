@@ -4,8 +4,8 @@
  * Sistema de Convites (invite-only)
  */
 
-import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi } from './lib/supabase.js?v=11';
-import storage from './state/storage-supabase.js?v=11';
+import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi } from './lib/supabase.js?v=12';
+import storage from './state/storage-supabase.js?v=12';
 
 // Expose para compatibilidade global
 window.supabase = supabase;
@@ -638,11 +638,13 @@ async function renderProducts() {
     return;
   }
 
-  let filtered = data || [];
+  // Ordena por codigo se existir
+  let filtered = (data || []).slice().sort((a,b)=> (a.codigo||9999) - (b.codigo||9999) || a.display_order - b.display_order);
   if (selectedCat) filtered = filtered.filter(p => p.category_id === selectedCat);
   if (searchQuery) filtered = filtered.filter(p => 
     p.name.toLowerCase().includes(searchQuery) ||
-    (p.description && p.description.toLowerCase().includes(searchQuery))
+    (p.description && p.description.toLowerCase().includes(searchQuery)) ||
+    String(p.codigo||'').includes(searchQuery)
   );
 
   if (!filtered.length) {
@@ -652,12 +654,13 @@ async function renderProducts() {
 
   container.innerHTML = filtered.map(prod => {
     const catName = prod.categories?.name || 'Sem categoria';
+    const codigoStr = prod.codigo ? String(prod.codigo).padStart(3,'0') : '—';
     return `
       <div class="item-row">
         <div class="item-main">
           ${prod.image_url ? `<img src="${prod.image_url}" class="item-thumb" alt="${prod.name}" />` : ''}
           <div>
-            <div class="item-info-title">${prod.name} ${!prod.available ? '<span class="badge badge-closed">Pausado</span>' : ''}</div>
+            <div class="item-info-title"><span style="color:var(--primary); font-weight:800; margin-right:0.35rem;">#${codigoStr}</span> ${prod.name} ${!prod.available ? '<span class="badge badge-closed">Pausado</span>' : ''}</div>
             <div class="item-info-meta">
               ${catName} • 
               <strong style="color: var(--secondary);">${formatCurrency(prod.base_price)}</strong>
@@ -685,9 +688,16 @@ async function renderProducts() {
 document.getElementById('filterProductCategory').addEventListener('change', renderProducts);
 document.getElementById('filterProductSearch').addEventListener('input', renderProducts);
 
+async function getNextCodigo() {
+  const { data } = await productsApi.listAdmin(currentStoreId);
+  const max = Math.max(0, ...(data||[]).map(p=> Number(p.codigo)||0));
+  return max ? max + 1 : 101;
+}
+
 async function openProductModal(prodId = null) {
   const titleEl = document.getElementById('productModalTitle');
   const idInput = document.getElementById('prodEditId');
+  const codigoInput = document.getElementById('prodCodigoInput');
   const nameInput = document.getElementById('prodNameInput');
   const catSelect = document.getElementById('prodCategorySelect');
   const priceInput = document.getElementById('prodPriceInput');
@@ -707,6 +717,7 @@ async function openProductModal(prodId = null) {
     idInput.value = prodId;
     const { data: prod } = await productsApi.getById(prodId);
     if (prod) {
+      codigoInput.value = prod.codigo || '';
       nameInput.value = prod.name;
       catSelect.value = prod.category_id;
       priceInput.value = prod.base_price;
@@ -722,6 +733,8 @@ async function openProductModal(prodId = null) {
   } else {
     titleEl.textContent = 'Novo Produto';
     idInput.value = '';
+    const next = await getNextCodigo();
+    codigoInput.value = next;
     nameInput.value = '';
     priceInput.value = '';
     descInput.value = '';
@@ -781,7 +794,21 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
     }
   }
 
+  const codigoVal = Number(document.getElementById('prodCodigoInput').value);
+  if (!codigoVal || codigoVal < 1 || codigoVal > 999) {
+    showToast('Código deve ser entre 1 e 999', 'error');
+    return;
+  }
+  // Valida duplicidade na loja
+  const { data: allProds } = await productsApi.listAdmin(currentStoreId);
+  const dup = (allProds||[]).find(p => Number(p.codigo) === codigoVal && p.id !== id);
+  if (dup) {
+    showToast(`Código ${String(codigoVal).padStart(3,'0')} já usado em "${dup.name}"`, 'error');
+    return;
+  }
+
   const productData = {
+    codigo: codigoVal,
     name: document.getElementById('prodNameInput').value.trim(),
     category_id: document.getElementById('prodCategorySelect').value,
     base_price: Number(document.getElementById('prodPriceInput').value),

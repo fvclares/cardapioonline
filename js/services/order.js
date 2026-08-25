@@ -32,6 +32,7 @@ const orderService = {
     const itemsSnapshot = items.map(item => ({
       productId: item.productId,
       productName: item.productName,
+      productCodigo: item.originalProduct?.codigo || item.codigo || null,
       unitPrice: Number(item.unitPrice),
       quantity: Number(item.quantity),
       crust: item.crust ? { ...item.crust } : null,

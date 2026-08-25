@@ -214,7 +214,7 @@ class StoreState {
       id: 'cart_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
       productId: product.id,
       productName: displayName,
-      originalProduct: { id: product.id, name: product.name, price: Number(product.price) },
+      originalProduct: { id: product.id, name: product.name, price: Number(product.price), codigo: product.codigo || null },
       secondFlavor: secondFlavor ? { id: secondFlavor.id, name: secondFlavor.name, price: Number(secondFlavor.price) } : null,
       size: size ? { name: size.name, price_diff: Number(size.price_diff || 0) } : null,
       basePrice,
