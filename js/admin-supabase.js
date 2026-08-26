@@ -821,12 +821,19 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
 
   showLoading(true);
   let error;
-  if (id) {
-    const result = await productsApi.update(id, productData);
+  async function trySave(data) {
+    if (id) return await productsApi.update(id, data);
+    return await productsApi.create(currentStoreId, data);
+  }
+  let result = await trySave(productData);
+  error = result.error;
+  // Fallback se coluna codigo ainda não existe no Supabase (cache de schema)
+  if (error && error.message && error.message.includes('codigo')) {
+    console.warn('Coluna codigo ausente, tentando sem codigo...', error.message);
+    const { codigo, ...withoutCodigo } = productData;
+    result = await trySave(withoutCodigo);
     error = result.error;
-  } else {
-    const result = await productsApi.create(currentStoreId, productData);
-    error = result.error;
+    if (!error) showToast('⚠️ Salvo sem código - rode fix-codigo-migration.sql no Supabase', 'info');
   }
   showLoading(false);
 
