@@ -170,11 +170,7 @@ async function initAuth() {
         errorEl.textContent = error.message;
       }
     } else if (data?.user) {
-      if (data.session) {
-        showToast('✅ Conta criada! Entrando...', 'success');
-      } else {
-        showToast('✅ Conta criada! Verifique seu e-mail para confirmar.', 'success');
-      }
+      showToast('✅ Conta criada! Entrando...', 'success');
     }
     btn.disabled = false;
     btn.textContent = '🚀 Criar Conta';
