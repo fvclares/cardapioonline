@@ -828,12 +828,13 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
   let result = await trySave(productData);
   error = result.error;
   // Fallback se coluna codigo ainda não existe no Supabase (cache de schema)
+  let usedFallback = false;
   if (error && error.message && error.message.includes('codigo')) {
     console.warn('Coluna codigo ausente, tentando sem codigo...', error.message);
     const { codigo, ...withoutCodigo } = productData;
     result = await trySave(withoutCodigo);
     error = result.error;
-    if (!error) showToast('⚠️ Salvo sem código - rode fix-codigo-migration.sql no Supabase', 'info');
+    usedFallback = !error;
   }
   showLoading(false);
 
@@ -842,7 +843,8 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
   } else {
     closeProductModal();
     renderProducts();
-    showToast('✅ Produto salvo!', 'success');
+    if (usedFallback) showToast('⚠️ Salvo sem código - rode fix-codigo-migration.sql no Supabase', 'info');
+    else showToast('✅ Produto salvo!', 'success');
   }
 });
 
