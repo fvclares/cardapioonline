@@ -166,6 +166,8 @@ async function initAuth() {
     if (error) {
       if (error.message.includes('already registered')) {
         errorEl.textContent = 'Este e-mail já possui conta. Faça login normalmente.';
+      } else if (error.message.includes('rate limit') || error.message.includes('429')) {
+        errorEl.textContent = 'Limite de e-mails atingido. Desative "Confirm email" no Supabase Auth ou aguarde 1h / use outro e-mail.';
       } else {
         errorEl.textContent = error.message;
       }
