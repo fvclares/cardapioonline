@@ -150,7 +150,7 @@ async function initAuth() {
     // Garante que o e-mail digitado é o convidado
     let expectedEmail = inviteResult[0].invite_email || inviteResult[0].email;
     if (!expectedEmail) {
-      const { data: inv } = await supabase.from('invites').select('email').eq('token', token).single();
+      const { data: inv } = await supabase.from('invites').select('email').eq('token', token).maybeSingle();
       expectedEmail = inv?.email || '';
     }
     if (email.toLowerCase() !== expectedEmail.toLowerCase()) {
@@ -246,7 +246,7 @@ async function setupInviteSignup(token) {
   // Busca e-mail do convite (validate pode não retornar, então busca direta)
   let inviteEmail = invite.invite_email || invite.email;
   if (!inviteEmail) {
-    const { data: inv } = await supabase.from('invites').select('email').eq('token', token).single();
+    const { data: inv } = await supabase.from('invites').select('email').eq('token', token).maybeSingle();
     inviteEmail = inv?.email || '';
   }
 
@@ -278,7 +278,7 @@ async function onAuthSuccess(user) {
     .from('profiles')
     .select('store_id, role, full_name')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
   currentUserProfile = profile;
   isSuperadmin = profile?.role === 'superadmin';
