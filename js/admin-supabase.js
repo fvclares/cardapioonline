@@ -130,7 +130,7 @@ async function initAuth() {
     e.preventDefault();
     const btn = document.getElementById('inviteSignupBtn');
     const email = document.getElementById('inviteSignupEmail').value.trim();
-    const fullName = document.getElementById('inviteSignupName').value.trim();
+    const fullName = '';
     const password = document.getElementById('inviteSignupPassword').value;
     const token = document.getElementById('inviteTokenValue').value;
     const errorEl = document.getElementById('inviteSignupError');
