@@ -4,8 +4,8 @@
  * Sistema de Convites (invite-only)
  */
 
-import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi } from './lib/supabase.js?v=12';
-import storage from './state/storage-supabase.js?v=12';
+import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi } from './lib/supabase.js?v=13';
+import storage from './state/storage-supabase.js?v=13';
 
 // Expose para compatibilidade global
 window.supabase = supabase;
@@ -689,9 +689,15 @@ document.getElementById('filterProductCategory').addEventListener('change', rend
 document.getElementById('filterProductSearch').addEventListener('input', renderProducts);
 
 async function getNextCodigo() {
-  const { data } = await productsApi.listAdmin(currentStoreId);
-  const max = Math.max(0, ...(data||[]).map(p=> Number(p.codigo)||0));
-  return max ? max + 1 : 101;
+  const { data, error } = await productsApi.listAdmin(currentStoreId);
+  if (error || !data || data.length === 0) return 101;
+  const used = new Set(data.map(p => Number(p.codigo)).filter(n => n >= 1 && n <= 999));
+  if (used.size === 0) return 101;
+  // Reusa primeira lacuna em 101..999 (padrão centenas), depois 1..100
+  for (let n = 101; n <= 999; n++) if (!used.has(n)) return n;
+  for (let n = 1; n < 101; n++) if (!used.has(n)) return n;
+  // Lotado (999 itens) - retorna próximo sequencial e deixa validação acusar
+  return Math.max(...used) + 1;
 }
 
 async function openProductModal(prodId = null) {
@@ -717,7 +723,7 @@ async function openProductModal(prodId = null) {
     idInput.value = prodId;
     const { data: prod } = await productsApi.getById(prodId);
     if (prod) {
-      codigoInput.value = prod.codigo || '';
+      codigoInput.value = prod.codigo || await getNextCodigo();
       nameInput.value = prod.name;
       catSelect.value = prod.category_id;
       priceInput.value = prod.base_price;
@@ -839,7 +845,11 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
   showLoading(false);
 
   if (error) {
-    showToast('Erro: ' + error.message, 'error');
+    if (error.message && error.message.includes('duplicate')) {
+      showToast(`Código ${String(codigoVal).padStart(3,'0')} já existe nesta loja`, 'error');
+    } else {
+      showToast('Erro: ' + error.message, 'error');
+    }
   } else {
     closeProductModal();
     renderProducts();
