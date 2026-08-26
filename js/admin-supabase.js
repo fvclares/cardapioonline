@@ -4,8 +4,8 @@
  * Sistema de Convites (invite-only)
  */
 
-import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi } from './lib/supabase.js?v=13';
-import storage from './state/storage-supabase.js?v=13';
+import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi } from './lib/supabase.js?v=14';
+import storage from './state/storage-supabase.js?v=14';
 
 // Expose para compatibilidade global
 window.supabase = supabase;
@@ -1325,11 +1325,9 @@ document.getElementById('btnCancelInvite').addEventListener('click', () => {
 document.getElementById('inviteForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const email = document.getElementById('inviteEmailInput').value.trim();
-  const storeName = document.getElementById('inviteStoreNameInput').value.trim();
-  const storeSlug = document.getElementById('inviteStoreSlugInput').value.trim().toLowerCase();
 
   showLoading(true);
-  const { data, error } = await invitesApi.create(email, storeName || null, storeSlug || null);
+  const { data, error } = await invitesApi.create(email, null, null);
   showLoading(false);
 
   if (error) {
@@ -1532,17 +1530,7 @@ document.getElementById('addonOptionForm').addEventListener('submit', async (e)=
   else { closeAddonOptionModal(); showToast('✅ Opção salva!','success'); renderAddons(); }
 });
 
-// Auto-gera slug do convite a partir do nome
-document.getElementById('inviteStoreNameInput').addEventListener('input', (e) => {
-  const slug = e.target.value
-    .toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-  document.getElementById('inviteStoreSlugInput').value = slug;
-});
+
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
