@@ -147,6 +147,18 @@ async function initAuth() {
       btn.textContent = '🚀 Criar Conta';
       return;
     }
+    // Garante que o e-mail digitado é o convidado
+    let expectedEmail = inviteResult[0].invite_email || inviteResult[0].email;
+    if (!expectedEmail) {
+      const { data: inv } = await supabase.from('invites').select('email').eq('token', token).single();
+      expectedEmail = inv?.email || '';
+    }
+    if (email.toLowerCase() !== expectedEmail.toLowerCase()) {
+      errorEl.textContent = `Use o e-mail convidado: ${expectedEmail}`;
+      btn.disabled = false;
+      btn.textContent = '🚀 Criar Conta';
+      return;
+    }
 
     // Cria conta com token no metadata
     const { data, error } = await auth.signUpWithInvite(email, password, token, fullName);
@@ -233,17 +245,29 @@ async function setupInviteSignup(token) {
   const invite = result[0];
   inviteTokenInput.value = token;
 
+  // Busca e-mail do convite (validate pode não retornar, então busca direta)
+  let inviteEmail = invite.invite_email || invite.email;
+  if (!inviteEmail) {
+    const { data: inv } = await supabase.from('invites').select('email').eq('token', token).single();
+    inviteEmail = inv?.email || '';
+  }
+
   // Mostra formulário de convite, esconde login
   inviteSignupForm.style.display = 'flex';
   passwordForm.style.display = 'none';
   authTitle.textContent = '✉️ Cadastro por Convite';
 
-  // Preenche email e hint da loja
-  document.getElementById('inviteSignupEmail').value = '';
+  // Preenche e-mail travado no convidado
+  const emailInput = document.getElementById('inviteSignupEmail');
+  emailInput.value = inviteEmail;
+  emailInput.readOnly = true;
+  emailInput.style.background = 'var(--bg-input)';
+  emailInput.style.opacity = '0.7';
+  emailInput.title = 'E-mail do convite - não pode ser alterado';
   if (invite.store_name) {
     inviteStoreHint.textContent = `Loja: ${invite.store_name}`;
   } else {
-    inviteStoreHint.textContent = 'Configure sua loja após o cadastro.';
+    inviteStoreHint.textContent = `Convite para ${inviteEmail} - configure sua loja após o cadastro.`;
   }
 }
 
