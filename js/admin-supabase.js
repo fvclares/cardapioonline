@@ -173,6 +173,7 @@ async function initAuth() {
       }
     } else if (data?.user) {
       showToast('✅ Conta criada! Entrando...', 'success');
+      setTimeout(() => location.reload(), 1200);
     }
     btn.disabled = false;
     btn.textContent = '🚀 Criar Conta';
