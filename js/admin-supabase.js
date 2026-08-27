@@ -66,6 +66,86 @@ function formatPhone(phone) {
   return phone;
 }
 
+const WEEK_DAYS = [
+  { key: 'seg', label: 'Segunda' },
+  { key: 'ter', label: 'Terça' },
+  { key: 'qua', label: 'Quarta' },
+  { key: 'qui', label: 'Quinta' },
+  { key: 'sex', label: 'Sexta' },
+  { key: 'sab', label: 'Sábado' },
+  { key: 'dom', label: 'Domingo' }
+];
+function renderSchedule(schedule){
+  const c = document.getElementById('scheduleContainer');
+  if(!c) return;
+  const sch = schedule || {};
+  c.innerHTML = WEEK_DAYS.map(d=>{
+    const v = sch[d.key] || { closed: true };
+    const closed = v.closed !== false; // default fechado se não definido
+    return `
+    <div style="display:flex; align-items:center; gap:0.5rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-md); padding:0.5rem 0.6rem;">
+      <span style="width:70px; font-weight:700; font-size:0.85rem;">${d.label}</span>
+      <label style="display:flex; align-items:center; gap:0.3rem; font-size:0.8rem; margin-right:0.5rem;"><input type="checkbox" data-day="${d.key}" class="schedule-closed" ${closed?'checked':''} style="width:auto;"> Fechado</label>
+      <input type="time" data-day="${d.key}" data-type="open" value="${v.open||'18:00'}" style="flex:1; padding:0.4rem;" ${closed?'disabled':''}>
+      <span style="color:var(--text-muted);">às</span>
+      <input type="time" data-day="${d.key}" data-type="close" value="${v.close||'23:00'}" style="flex:1; padding:0.4rem;" ${closed?'disabled':''}>
+    </div>`;
+  }).join('');
+  c.querySelectorAll('.schedule-closed').forEach(ch=>{
+    ch.addEventListener('change', (e)=>{
+      const day=e.target.dataset.day;
+      const closed=e.target.checked;
+      c.querySelectorAll(`input[data-day="${day}"][data-type]`).forEach(inp=> inp.disabled=closed);
+      updateComputedStatus();
+    });
+  });
+  c.querySelectorAll('input[data-type]').forEach(inp=> inp.addEventListener('change', updateComputedStatus));
+}
+function getScheduleFromForm(){
+  const c=document.getElementById('scheduleContainer');
+  const out={};
+  WEEK_DAYS.forEach(d=>{
+    const closed=c.querySelector(`.schedule-closed[data-day="${d.key}"]`)?.checked;
+    if(closed) out[d.key]={ closed:true };
+    else {
+      const open=c.querySelector(`input[data-day="${d.key}"][data-type="open"]`)?.value || '18:00';
+      const close=c.querySelector(`input[data-day="${d.key}"][data-type="close"]`)?.value || '23:00';
+      out[d.key]={ closed:false, open, close };
+    }
+  });
+  return out;
+}
+function isStoreOpenNow(schedule){
+  if(!schedule) return true; // sem horário = aberto
+  const map={0:'dom',1:'seg',2:'ter',3:'qua',4:'qui',5:'sex',6:'sab'};
+  const now=new Date();
+  const key=map[now.getDay()];
+  const day=schedule[key];
+  if(!day || day.closed) return false;
+  const [oh,om]= (day.open||'00:00').split(':').map(Number);
+  const [ch,cm]= (day.close||'23:59').split(':').map(Number);
+  const cur=now.getHours()*60+now.getMinutes();
+  const open=oh*60+om, close=ch*60+cm;
+  if(close<open) return cur>=open || cur<=close; // vira noite
+  return cur>=open && cur<=close;
+}
+function scheduleToText(schedule){
+  if(!schedule) return '';
+  return WEEK_DAYS.filter(d=> !schedule[d.key]?.closed).map(d=>{
+    const v=schedule[d.key];
+    return `${d.label} ${v.open}-${v.close}`;
+  }).join(', ');
+}
+function updateComputedStatus(){
+  const sch=getScheduleFromForm();
+  const open=isStoreOpenNow(sch);
+  const inp=document.getElementById('storeStatusInput');
+  const txt=document.getElementById('storeStatusText');
+  if(inp) inp.checked=open;
+  if(txt){ txt.textContent=open?'Aberto':'Fechado'; txt.style.color=open?'var(--status-open)':'var(--status-closed)'; }
+  return open;
+}
+
 // Compressão de imagem para cardápio (max 800px, JPEG 0.7)
 async function compressImage(file, maxSide = 800, quality = 0.7) {
   return new Promise((resolve, reject) => {
@@ -381,7 +461,6 @@ async function loadStoreData() {
   document.getElementById('storePhoneInput').value = store.phone || '';
   document.getElementById('storePhoneDisplayInput').value = store.phone_display || '';
   document.getElementById('storeAddressInput').value = store.address || '';
-  document.getElementById('storeHoursInput').value = store.opening_hours || '';
   document.getElementById('storeDeliveryFeeInput').value = store.default_delivery_fee || 7.00;
   document.getElementById('storeMinOrderInput').value = store.min_order_value || 35.00;
   document.getElementById('storeLogoCurrentUrl').value = store.logo_url || '';
@@ -393,7 +472,12 @@ async function loadStoreData() {
   if (store.cover_url) showPreview('storeCoverPreview', store.cover_url);
   else document.getElementById('storeCoverPreview').innerHTML = '';
 
-  const isOpen = store.status === 'open';
+  // Horário por dia
+  const { data: settings } = await settingsApi.get(currentStoreId);
+  const schedule = settings?.schedule || null;
+  renderSchedule(schedule);
+  document.getElementById('storeHoursInput').value = scheduleToText(schedule);
+  const isOpen = isStoreOpenNow(schedule);
   const statusInput = document.getElementById('storeStatusInput');
   const statusText = document.getElementById('storeStatusText');
   statusInput.checked = isOpen;
@@ -484,22 +568,28 @@ document.getElementById('storeSettingsForm').addEventListener('submit', async (e
     return;
   }
 
+  const schedule = getScheduleFromForm();
+  const computedStatus = isStoreOpenNow(schedule) ? 'open' : 'closed';
+  const openingHoursText = scheduleToText(schedule);
+  document.getElementById('storeHoursInput').value = openingHoursText;
+
   const updates = {
     name: document.getElementById('storeNameInput').value.trim(),
     slug: document.getElementById('storeSlugInput').value.trim().toLowerCase(),
     phone: document.getElementById('storePhoneInput').value.replace(/\D/g, ''),
     phone_display: document.getElementById('storePhoneDisplayInput').value.trim(),
     address: document.getElementById('storeAddressInput').value.trim(),
-    opening_hours: document.getElementById('storeHoursInput').value.trim(),
+    opening_hours: openingHoursText,
     default_delivery_fee: Number(document.getElementById('storeDeliveryFeeInput').value) || 7.00,
     min_order_value: Number(document.getElementById('storeMinOrderInput').value) || 35.00,
     logo_url: logoUrl,
     cover_url: coverUrl,
-    status: document.getElementById('storeStatusInput').checked ? 'open' : 'closed'
+    status: computedStatus
   };
 
   showLoading(true);
   const { data, error } = await storeApi.update(currentStore.id, updates);
+  if (!error) await settingsApi.upsert(currentStoreId, { schedule });
   showLoading(false);
 
   if (error) {

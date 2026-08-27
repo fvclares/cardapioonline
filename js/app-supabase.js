@@ -50,8 +50,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (ogDesc) ogDesc.content = store.description || 'Faça seu pedido online!';
     if (footerStoreName) footerStoreName.textContent = store.name;
 
-    // 5. Verifica se loja está aberta
-    if (store.status !== 'open') {
+    // 5. Verifica se loja está aberta (considera horário por dia)
+    const _settings = storage.getSettings ? storage.getSettings() : {};
+    const _schedule = _settings?.schedule;
+    const _isOpen = (()=>{
+      if(!_schedule || !Object.keys(_schedule).length) return store.status==='open';
+      const map={0:'dom',1:'seg',2:'ter',3:'qua',4:'qui',5:'sex',6:'sab'};
+      const now=new Date(); const key=map[now.getDay()]; const day=_schedule[key];
+      if(!day || day.closed) return false;
+      const [oh,om]=(day.open||'00:00').split(':').map(Number);
+      const [ch,cm]=(day.close||'23:59').split(':').map(Number);
+      const cur=now.getHours()*60+now.getMinutes(); const open=oh*60+om, close=ch*60+cm;
+      if(close<open) return cur>=open || cur<=close;
+      return cur>=open && cur<=close;
+    })();
+    if (!_isOpen) {
       loadingScreen.classList.add('hidden');
       showStoreClosed(store);
       return;

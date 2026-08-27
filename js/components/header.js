@@ -3,13 +3,24 @@
  * Compatível com file:// e http://
  */
 
+function isStoreOpenNowHeader(schedule, fallbackStatus){
+  if(!schedule || !Object.keys(schedule).length) return fallbackStatus==='open';
+  const map={0:'dom',1:'seg',2:'ter',3:'qua',4:'qui',5:'sex',6:'sab'};
+  const now=new Date(); const key=map[now.getDay()]; const day=schedule[key];
+  if(!day || day.closed) return false;
+  const [oh,om]=(day.open||'00:00').split(':').map(Number);
+  const [ch,cm]=(day.close||'23:59').split(':').map(Number);
+  const cur=now.getHours()*60+now.getMinutes(); const open=oh*60+om, close=ch*60+cm;
+  if(close<open) return cur>=open || cur<=close;
+  return cur>=open && cur<=close;
+}
 function renderHeader(container) {
   const store = window.appState.store;
   const customer = window.appState.customer;
   const lastOrder = window.orderService.getLastOrder();
   const cs = window.customerService;
-
-  const isOpen = store.status === 'open';
+  const schedule = window.appState?.settings?.schedule || window.appState?.store?.schedule || window.storage?.getSettings?.()?.schedule;
+  const isOpen = isStoreOpenNowHeader(schedule, store.status);
 
   let customerBarHtml = '';
   if (customer && customer.name) {

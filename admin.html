@@ -195,11 +195,12 @@
             <div class="admin-card-header">
               <h2 class="admin-card-title">🏪 Informações da Pizzaria</h2>
               <div style="display: flex; align-items: center; gap: 0.75rem;">
-                <label class="switch-label">
-                  <input type="checkbox" id="storeStatusInput" class="switch-input" />
+                <label class="switch-label" style="opacity:0.7; pointer-events:none;">
+                  <input type="checkbox" id="storeStatusInput" class="switch-input" disabled />
                   <span class="switch-slider"></span>
-                  <span id="storeStatusText" style="font-weight: 700; font-size: 0.85rem;">Aberto</span>
+                  <span id="storeStatusText" style="font-weight: 700; font-size: 0.85rem;">Calculando...</span>
                 </label>
+                <span style="font-size:0.7rem; color:var(--text-muted);">automático por horário</span>
               </div>
             </div>
 
@@ -227,15 +228,18 @@
               </div>
             </div>
 
-            <div class="form-grid form-grid-2" style="margin-bottom: 1.25rem;">
-              <div class="form-group">
-                <label class="form-label">Endereço</label>
-                <input type="text" id="storeAddressInput" />
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+              <label class="form-label">Endereço</label>
+              <input type="text" id="storeAddressInput" />
+            </div>
+
+            <div style="margin-bottom: 1.5rem; background: var(--bg-input); border:1px solid var(--border); border-radius: var(--radius-md); padding:1rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+                <label class="form-label" style="margin:0;">Horário de Atendimento</label>
+                <span style="font-size:0.75rem; color:var(--text-muted);">dias vazios = fechado</span>
               </div>
-              <div class="form-group">
-                <label class="form-label">Horário de Atendimento</label>
-                <input type="text" id="storeHoursInput" placeholder="Ex: Terça a Domingo das 18h30 às 23h30" />
-              </div>
+              <div id="scheduleContainer" style="display:flex; flex-direction:column; gap:0.5rem;"></div>
+              <input type="hidden" id="storeHoursInput" />
             </div>
 
             <div class="form-grid form-grid-2" style="margin-bottom: 1.25rem;">
