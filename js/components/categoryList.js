@@ -14,17 +14,17 @@ function renderCategoryNav(container, onSearch) {
           <span class="search-icon">🔍</span>
           <input type="text" id="menuSearchInput" placeholder="Buscar pizza, sabor, bebida, sobremesa..." />
         </div>
-        <div style="display:flex; gap:0.5rem; margin-top:0.6rem; align-items:flex-start;">
-          <select id="sizeFilterSelect" style="flex:1; padding:0.5rem; border-radius:var(--radius-md); border:1px solid var(--border); background:var(--bg-input); color:var(--text-primary); font-size:0.85rem;">
+        <div style="display:flex; flex-direction:column; gap:0.6rem; margin-top:0.6rem;">
+          <select id="sizeFilterSelect" style="width:100%; padding:0.6rem; border-radius:var(--radius-md); border:1px solid var(--border); background:var(--bg-input); color:var(--text-primary); font-size:0.85rem;">
             <option value="">Todos os tamanhos</option>
             ${pizzaSizes.map(s=>`<option value="${s.id}">${s.name.split('(')[0].trim()}</option>`).join('')}
           </select>
-          <div style="flex:1.2; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius-md); padding:0.4rem 0.6rem;">
+          <div style="background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius-md); padding:0.5rem 0.6rem;">
             <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:var(--text-muted); font-weight:600;">
               <span>Faixa de preço</span>
               <span id="priceRangeLabel">Todos</span>
             </div>
-            <input type="range" id="priceRangeSlider" min="0" max="100" value="0" step="5" style="width:100%; accent-color:var(--primary); margin-top:0.3rem;">
+            <input type="range" id="priceRangeSlider" min="0" max="100" value="0" step="5" style="width:100%; accent-color:var(--primary); margin-top:0.4rem;">
             <div style="display:flex; justify-content:space-between; font-size:0.65rem; color:var(--text-muted); margin-top:0.15rem;">
               <span>R$ 0</span><span>R$ 150</span>
             </div>
