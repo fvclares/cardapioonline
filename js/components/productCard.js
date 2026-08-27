@@ -51,16 +51,24 @@ function renderProductSections(container, searchQuery = '', onSelectProduct) {
     const [minStr, maxStr] = filter.priceRange.split('-');
     const min = Number(minStr||0), max = Number(maxStr||9999);
     filteredProducts = filteredProducts.filter(p => {
-      let price;
-      if (p.is_pizza && filter.sizeId) {
+      if (p.is_pizza) {
         const allPrices = window.appState?.productSizePrices || [];
-        const found = allPrices.find(pr=> pr.product_id===p.id && pr.size_id===filter.sizeId);
-        price = found ? Number(found.price) : null;
-        if (price===null) return false;
+        const myPrices = allPrices.filter(pr=> pr.product_id===p.id);
+        if (filter.sizeId) {
+          const found = myPrices.find(pr=> pr.size_id===filter.sizeId);
+          if (!found) return false;
+          const price = Number(found.price);
+          return price >= min && price <= max;
+        } else {
+          // sem tamanho selecionado: verifica se ALGUM tamanho está na faixa
+          if (myPrices.length) return myPrices.some(pr=> { const v=Number(pr.price); return v>=min && v<=max; });
+          const price = getDisplayPrice(p);
+          return price >= min && price <= max;
+        }
       } else {
-        price = getDisplayPrice(p);
+        const price = getDisplayPrice(p);
+        return price >= min && price <= max;
       }
-      return price >= min && price <= max;
     });
   }
 
