@@ -24,11 +24,9 @@ function renderCategoryNav(container, onSearch) {
               <span>Faixa de preço</span>
               <span id="priceRangeLabel">Todos</span>
             </div>
-            <div style="display:flex; align-items:center; gap:0.4rem; margin-top:0.3rem;">
-              <span style="font-size:0.7rem; color:var(--text-muted);">R$<span id="priceMinVal">0</span></span>
-              <input type="range" id="priceMinRange" min="0" max="150" value="0" step="5" style="flex:1; accent-color:var(--primary);">
-              <input type="range" id="priceMaxRange" min="0" max="150" value="150" step="5" style="flex:1; accent-color:var(--primary);">
-              <span style="font-size:0.7rem; color:var(--text-muted);">R$<span id="priceMaxVal">150</span></span>
+            <input type="range" id="priceRangeSlider" min="0" max="100" value="0" step="5" style="width:100%; accent-color:var(--primary); margin-top:0.3rem;">
+            <div style="display:flex; justify-content:space-between; font-size:0.65rem; color:var(--text-muted); margin-top:0.15rem;">
+              <span>R$ 0</span><span>R$ 150</span>
             </div>
           </div>
         </div>
@@ -47,28 +45,19 @@ function renderCategoryNav(container, onSearch) {
   function emitFilter(){
     const q = container.querySelector('#menuSearchInput')?.value.trim().toLowerCase() || '';
     const sizeId = container.querySelector('#sizeFilterSelect')?.value || '';
-    const minEl = container.querySelector('#priceMinRange');
-    const maxEl = container.querySelector('#priceMaxRange');
-    let min = Number(minEl?.value || 0);
-    let max = Number(maxEl?.value || 150);
-    if (min > max) { const t=min; min=max; max=t; if(minEl) minEl.value=min; if(maxEl) maxEl.value=max; }
-    const priceRange = (min===0 && max===150) ? '' : `${min}-${max}`;
+    const slider = container.querySelector('#priceRangeSlider');
+    const min = Number(slider?.value || 0);
+    const priceRange = min === 0 ? '' : `${min}-${min+50}`;
     const label = container.querySelector('#priceRangeLabel');
-    const minLabel = container.querySelector('#priceMinVal');
-    const maxLabel = container.querySelector('#priceMaxVal');
-    if (label) label.textContent = priceRange ? `R$ ${min} – ${max}` : 'Todos';
-    if (minLabel) minLabel.textContent = min;
-    if (maxLabel) maxLabel.textContent = max;
+    if (label) label.textContent = priceRange ? `R$ ${min} – ${min+50}` : 'Todos';
     if (onSearch) onSearch({ query: q, sizeId, priceRange });
   }
   const searchInput = container.querySelector('#menuSearchInput');
   if (searchInput && onSearch) searchInput.addEventListener('input', emitFilter);
   const sizeSel = container.querySelector('#sizeFilterSelect');
   if (sizeSel) sizeSel.addEventListener('change', emitFilter);
-  const minRange = container.querySelector('#priceMinRange');
-  const maxRange = container.querySelector('#priceMaxRange');
-  if (minRange) minRange.addEventListener('input', emitFilter);
-  if (maxRange) maxRange.addEventListener('input', emitFilter);
+  const rangeSlider = container.querySelector('#priceRangeSlider');
+  if (rangeSlider) rangeSlider.addEventListener('input', emitFilter);
 
   // Smooth scroll ao clicar na categoria
   const pills = container.querySelectorAll('.category-pill');
