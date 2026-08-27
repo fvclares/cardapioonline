@@ -14,18 +14,23 @@ function renderCategoryNav(container, onSearch) {
           <span class="search-icon">🔍</span>
           <input type="text" id="menuSearchInput" placeholder="Buscar pizza, sabor, bebida, sobremesa..." />
         </div>
-        <div style="display:flex; gap:0.5rem; margin-top:0.6rem;">
+        <div style="display:flex; gap:0.5rem; margin-top:0.6rem; align-items:flex-start;">
           <select id="sizeFilterSelect" style="flex:1; padding:0.5rem; border-radius:var(--radius-md); border:1px solid var(--border); background:var(--bg-input); color:var(--text-primary); font-size:0.85rem;">
             <option value="">Todos os tamanhos</option>
             ${pizzaSizes.map(s=>`<option value="${s.id}">${s.name.split('(')[0].trim()}</option>`).join('')}
           </select>
-          <select id="priceFilterSelect" style="flex:1; padding:0.5rem; border-radius:var(--radius-md); border:1px solid var(--border); background:var(--bg-input); color:var(--text-primary); font-size:0.85rem;">
-            <option value="">Todas as faixas</option>
-            <option value="0-30">Até R$ 30</option>
-            <option value="30-50">R$ 30 – 50</option>
-            <option value="50-80">R$ 50 – 80</option>
-            <option value="80-999">Acima de R$ 80</option>
-          </select>
+          <div style="flex:1.2; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius-md); padding:0.4rem 0.6rem;">
+            <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:var(--text-muted); font-weight:600;">
+              <span>Faixa de preço</span>
+              <span id="priceRangeLabel">Todos</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:0.4rem; margin-top:0.3rem;">
+              <span style="font-size:0.7rem; color:var(--text-muted);">R$<span id="priceMinVal">0</span></span>
+              <input type="range" id="priceMinRange" min="0" max="150" value="0" step="5" style="flex:1; accent-color:var(--primary);">
+              <input type="range" id="priceMaxRange" min="0" max="150" value="150" step="5" style="flex:1; accent-color:var(--primary);">
+              <span style="font-size:0.7rem; color:var(--text-muted);">R$<span id="priceMaxVal">150</span></span>
+            </div>
+          </div>
         </div>
 
         <nav class="categories-scroll" id="categoriesNav">
@@ -42,15 +47,28 @@ function renderCategoryNav(container, onSearch) {
   function emitFilter(){
     const q = container.querySelector('#menuSearchInput')?.value.trim().toLowerCase() || '';
     const sizeId = container.querySelector('#sizeFilterSelect')?.value || '';
-    const priceRange = container.querySelector('#priceFilterSelect')?.value || '';
+    const minEl = container.querySelector('#priceMinRange');
+    const maxEl = container.querySelector('#priceMaxRange');
+    let min = Number(minEl?.value || 0);
+    let max = Number(maxEl?.value || 150);
+    if (min > max) { const t=min; min=max; max=t; if(minEl) minEl.value=min; if(maxEl) maxEl.value=max; }
+    const priceRange = (min===0 && max===150) ? '' : `${min}-${max}`;
+    const label = container.querySelector('#priceRangeLabel');
+    const minLabel = container.querySelector('#priceMinVal');
+    const maxLabel = container.querySelector('#priceMaxVal');
+    if (label) label.textContent = priceRange ? `R$ ${min} – ${max}` : 'Todos';
+    if (minLabel) minLabel.textContent = min;
+    if (maxLabel) maxLabel.textContent = max;
     if (onSearch) onSearch({ query: q, sizeId, priceRange });
   }
   const searchInput = container.querySelector('#menuSearchInput');
   if (searchInput && onSearch) searchInput.addEventListener('input', emitFilter);
   const sizeSel = container.querySelector('#sizeFilterSelect');
-  const priceSel = container.querySelector('#priceFilterSelect');
   if (sizeSel) sizeSel.addEventListener('change', emitFilter);
-  if (priceSel) priceSel.addEventListener('change', emitFilter);
+  const minRange = container.querySelector('#priceMinRange');
+  const maxRange = container.querySelector('#priceMaxRange');
+  if (minRange) minRange.addEventListener('input', emitFilter);
+  if (maxRange) maxRange.addEventListener('input', emitFilter);
 
   // Smooth scroll ao clicar na categoria
   const pills = container.querySelectorAll('.category-pill');
