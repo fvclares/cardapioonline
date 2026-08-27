@@ -68,7 +68,7 @@ function renderProductSections(container, searchQuery = '', onSelectProduct) {
                     ${(()=>{
                       const sps=getSizePrices(product);
                       if(sps.length){
-                        return `<div style="display:flex; flex-wrap:wrap; gap:0.35rem;">${sps.map(sp=>`<span style="background:var(--bg-input); border:1px solid var(--border); border-radius:999px; padding:0.15rem 0.5rem; font-size:0.75rem; font-weight:700;">${sp.size.name} ${cs?cs.formatCurrency(sp.price):'R$ '+sp.price}</span>`).join('')}</div>`;
+                        return `<div style="display:flex; gap:0.4rem; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none;">${sps.map(sp=>`<span style="font-size:0.78rem; font-weight:700; white-space:nowrap;">${sp.size.name.split('(')[0].trim()} ${cs?cs.formatCurrency(sp.price):'R$ '+sp.price}</span>`).join('<span style="color:var(--text-muted);">•</span>')}</div>`;
                       } else {
                         return `<span class="product-price">${cs ? cs.formatCurrency(getDisplayPrice(product)) : 'R$ ' + getDisplayPrice(product)}</span>`;
                       }
