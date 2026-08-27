@@ -5,6 +5,7 @@
 
 function renderCategoryNav(container, onSearch) {
   const categories = (window.appState.categories || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+  const pizzaSizes = (window.appState.pizzaSizes || window.storage?.getPizzaSizes?.() || []).filter(s=>s.is_active!==false).sort((a,b)=>(a.display_order||0)-(b.display_order||0));
 
   container.innerHTML = `
     <div class="sticky-nav-container">
@@ -12,6 +13,19 @@ function renderCategoryNav(container, onSearch) {
         <div class="search-box">
           <span class="search-icon">🔍</span>
           <input type="text" id="menuSearchInput" placeholder="Buscar pizza, sabor, bebida, sobremesa..." />
+        </div>
+        <div style="display:flex; gap:0.5rem; margin-top:0.6rem;">
+          <select id="sizeFilterSelect" style="flex:1; padding:0.5rem; border-radius:var(--radius-md); border:1px solid var(--border); background:var(--bg-input); color:var(--text-primary); font-size:0.85rem;">
+            <option value="">Todos os tamanhos</option>
+            ${pizzaSizes.map(s=>`<option value="${s.id}">${s.name.split('(')[0].trim()}</option>`).join('')}
+          </select>
+          <select id="priceFilterSelect" style="flex:1; padding:0.5rem; border-radius:var(--radius-md); border:1px solid var(--border); background:var(--bg-input); color:var(--text-primary); font-size:0.85rem;">
+            <option value="">Todas as faixas</option>
+            <option value="0-30">Até R$ 30</option>
+            <option value="30-50">R$ 30 – 50</option>
+            <option value="50-80">R$ 50 – 80</option>
+            <option value="80-999">Acima de R$ 80</option>
+          </select>
         </div>
 
         <nav class="categories-scroll" id="categoriesNav">
@@ -25,12 +39,18 @@ function renderCategoryNav(container, onSearch) {
     </div>
   `;
 
-  const searchInput = container.querySelector('#menuSearchInput');
-  if (searchInput && onSearch) {
-    searchInput.addEventListener('input', (e) => {
-      onSearch(e.target.value.trim().toLowerCase());
-    });
+  function emitFilter(){
+    const q = container.querySelector('#menuSearchInput')?.value.trim().toLowerCase() || '';
+    const sizeId = container.querySelector('#sizeFilterSelect')?.value || '';
+    const priceRange = container.querySelector('#priceFilterSelect')?.value || '';
+    if (onSearch) onSearch({ query: q, sizeId, priceRange });
   }
+  const searchInput = container.querySelector('#menuSearchInput');
+  if (searchInput && onSearch) searchInput.addEventListener('input', emitFilter);
+  const sizeSel = container.querySelector('#sizeFilterSelect');
+  const priceSel = container.querySelector('#priceFilterSelect');
+  if (sizeSel) sizeSel.addEventListener('change', emitFilter);
+  if (priceSel) priceSel.addEventListener('change', emitFilter);
 
   // Smooth scroll ao clicar na categoria
   const pills = container.querySelectorAll('.category-pill');

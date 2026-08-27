@@ -23,18 +23,45 @@ function getSizePrices(product){
   }).filter(Boolean);
 }
 function renderProductSections(container, searchQuery = '', onSelectProduct) {
+  // compat: searchQuery pode ser string ou objeto {query, sizeId, priceRange}
+  let filter = { query: '', sizeId: '', priceRange: '' };
+  if (typeof searchQuery === 'string') filter.query = searchQuery;
+  else if (searchQuery && typeof searchQuery === 'object') filter = { query: searchQuery.query||'', sizeId: searchQuery.sizeId||'', priceRange: searchQuery.priceRange||'' };
   const categories = (window.appState.categories || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
   const products = (window.appState.products || []).filter(p => p.available !== false).slice().sort((a,b)=> (a.codigo||9999)-(b.codigo||9999) || (a.order||0)-(b.order||0));
   const cs = window.customerService;
 
   let filteredProducts = products;
-  if (searchQuery) {
-    const q = searchQuery.toLowerCase();
-    filteredProducts = products.filter(p => 
+  if (filter.query) {
+    const q = filter.query.toLowerCase();
+    filteredProducts = filteredProducts.filter(p => 
       p.name.toLowerCase().includes(q) ||
       (p.description && p.description.toLowerCase().includes(q)) ||
       String(p.codigo||'').includes(q)
     );
+  }
+  if (filter.sizeId) {
+    filteredProducts = filteredProducts.filter(p => {
+      if (!p.is_pizza) return false;
+      const allPrices = window.appState?.productSizePrices || [];
+      return allPrices.some(pr=> pr.product_id===p.id && pr.size_id===filter.sizeId);
+    });
+  }
+  if (filter.priceRange) {
+    const [minStr, maxStr] = filter.priceRange.split('-');
+    const min = Number(minStr||0), max = Number(maxStr||9999);
+    filteredProducts = filteredProducts.filter(p => {
+      let price;
+      if (p.is_pizza && filter.sizeId) {
+        const allPrices = window.appState?.productSizePrices || [];
+        const found = allPrices.find(pr=> pr.product_id===p.id && pr.size_id===filter.sizeId);
+        price = found ? Number(found.price) : null;
+        if (price===null) return false;
+      } else {
+        price = getDisplayPrice(p);
+      }
+      return price >= min && price <= max;
+    });
   }
 
   if (filteredProducts.length === 0) {
@@ -74,7 +101,6 @@ function renderProductSections(container, searchQuery = '', onSelectProduct) {
                       }
                     })()}
                   </div>
-                  <button class="btn-add-circle" title="Adicionar à sacola">+</button>
                 </div>
               </div>
               ${product.image ? `<div class="product-image-container"><img src="${product.image}" alt="${product.name}" class="product-image" loading="lazy" /></div>` : ''}

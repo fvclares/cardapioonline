@@ -64,9 +64,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 7. Renderiza navegação de categorias
     if (window.renderCategoryNav) {
-      window.renderCategoryNav(navContainer, (query) => {
+      window.renderCategoryNav(navContainer, (filter) => {
         if (window.renderProductSections) {
-          window.renderProductSections(menuContainer, query, (product) => {
+          window.renderProductSections(menuContainer, filter, (product) => {
             if (window.setupProductModal) {
               const modal = window.setupProductModal();
               modal.openModal(product);
