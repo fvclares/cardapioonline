@@ -5,7 +5,19 @@
 
 function renderCategoryNav(container, onSearch) {
   const categories = (window.appState.categories || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
-  const pizzaSizes = (window.appState.pizzaSizes || window.storage?.getPizzaSizes?.() || []).filter(s=>s.is_active!==false).sort((a,b)=>(a.display_order||0)-(b.display_order||0));
+  let pizzaSizes = (window.appState.pizzaSizes || window.storage?.getPizzaSizes?.() || []).filter(s=>s.is_active!==false).sort((a,b)=>(a.display_order||0)-(b.display_order||0));
+  // fallback: tenta recarregar após 500ms se ainda vazio (storage async)
+  if (!pizzaSizes.length) {
+    setTimeout(()=>{
+      const later = (window.appState.pizzaSizes || window.storage?.getPizzaSizes?.() || []).filter(s=>s.is_active!==false);
+      if (later.length) {
+        const sel = container.querySelector('#sizeFilterSelect');
+        if (sel) {
+          sel.innerHTML = '<option value="">Todos os tamanhos</option>' + later.sort((a,b)=>(a.display_order||0)-(b.display_order||0)).map(s=>`<option value="${s.id}">${s.name.split('(')[0].trim()}</option>`).join('');
+        }
+      }
+    }, 600);
+  }
 
   container.innerHTML = `
     <div class="sticky-nav-container">
