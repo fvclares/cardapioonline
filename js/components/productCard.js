@@ -8,11 +8,19 @@ function getDisplayPrice(product){
   const sizes = window.appState?.pizzaSizes || window.storage?.getPizzaSizes?.() || [];
   if (!sizes.length) return Number(product.price||0);
   const prices = window.appState?.productSizePrices || window.storage?.getProductSizePrices?.(product.id) || [];
-  // filtra preços deste produto
   const myPrices = Array.isArray(prices) ? prices.filter(p=> p.product_id===product.id) : [];
   if (myPrices.length) return Math.min(...myPrices.map(p=>Number(p.price)));
-  // fallback para product.price
   return Number(product.price||0);
+}
+function getSizePrices(product){
+  if (!product.is_pizza) return [];
+  const sizes = (window.appState?.pizzaSizes || window.storage?.getPizzaSizes?.() || []).filter(s=>s.is_active!==false).sort((a,b)=>(a.display_order||0)-(b.display_order||0));
+  if (!sizes.length) return [];
+  const allPrices = window.appState?.productSizePrices || [];
+  return sizes.map(s=>{
+    const found = allPrices.find(p=> p.product_id===product.id && p.size_id===s.id);
+    return found ? { size: s, price: Number(found.price) } : null;
+  }).filter(Boolean);
 }
 function renderProductSections(container, searchQuery = '', onSelectProduct) {
   const categories = (window.appState.categories || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -56,9 +64,15 @@ function renderProductSections(container, searchQuery = '', onSelectProduct) {
                   <p class="product-description">${product.description || ''}</p>
                 </div>
                 <div class="product-price-bar">
-                  <div>
-                    <span class="product-price-prefix">A partir de</span><br/>
-                    <span class="product-price">${cs ? cs.formatCurrency(getDisplayPrice(product)) : 'R$ ' + getDisplayPrice(product)}</span>
+                  <div style="flex:1;">
+                    ${(()=>{
+                      const sps=getSizePrices(product);
+                      if(sps.length){
+                        return `<div style="display:flex; flex-wrap:wrap; gap:0.35rem;">${sps.map(sp=>`<span style="background:var(--bg-input); border:1px solid var(--border); border-radius:999px; padding:0.15rem 0.5rem; font-size:0.75rem; font-weight:700;">${sp.size.name} ${cs?cs.formatCurrency(sp.price):'R$ '+sp.price}</span>`).join('')}</div>`;
+                      } else {
+                        return `<span class="product-price">${cs ? cs.formatCurrency(getDisplayPrice(product)) : 'R$ ' + getDisplayPrice(product)}</span>`;
+                      }
+                    })()}
                   </div>
                   <button class="btn-add-circle" title="Adicionar à sacola">+</button>
                 </div>
