@@ -20,9 +20,12 @@ function renderCategoryNav(container, onSearch) {
             ${pizzaSizes.map(s=>`<option value="${s.id}">${s.name.split('(')[0].trim()}</option>`).join('')}
           </select>
           <div style="background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius-md); padding:0.5rem 0.6rem;">
-            <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:var(--text-muted); font-weight:600;">
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.7rem; color:var(--text-muted); font-weight:600;">
               <span>Faixa de preço</span>
-              <span id="priceRangeLabel">Todos</span>
+              <div style="display:flex; gap:0.4rem; align-items:center;">
+                <span id="priceRangeLabel">Todos</span>
+                <button id="priceClearBtn" style="display:none; font-size:0.65rem; color:var(--primary); background:none; border:none; cursor:pointer;">Limpar</button>
+              </div>
             </div>
             <input type="range" id="priceRangeSlider" min="0" max="100" value="0" step="5" style="width:100%; accent-color:var(--primary); margin-top:0.4rem;">
             <div style="display:flex; justify-content:space-between; font-size:0.65rem; color:var(--text-muted); margin-top:0.15rem;">
@@ -42,14 +45,17 @@ function renderCategoryNav(container, onSearch) {
     </div>
   `;
 
+  let priceActive = false;
   function emitFilter(){
     const q = container.querySelector('#menuSearchInput')?.value.trim().toLowerCase() || '';
     const sizeId = container.querySelector('#sizeFilterSelect')?.value || '';
     const slider = container.querySelector('#priceRangeSlider');
     const min = Number(slider?.value || 0);
-    const priceRange = min === 0 ? '' : `${min}-${min+50}`;
+    const priceRange = priceActive ? `${min}-${min+50}` : '';
     const label = container.querySelector('#priceRangeLabel');
+    const clearBtn = container.querySelector('#priceClearBtn');
     if (label) label.textContent = priceRange ? `R$ ${min} – ${min+50}` : 'Todos';
+    if (clearBtn) clearBtn.style.display = priceActive ? 'block' : 'none';
     if (onSearch) onSearch({ query: q, sizeId, priceRange });
   }
   const searchInput = container.querySelector('#menuSearchInput');
@@ -57,7 +63,9 @@ function renderCategoryNav(container, onSearch) {
   const sizeSel = container.querySelector('#sizeFilterSelect');
   if (sizeSel) sizeSel.addEventListener('change', emitFilter);
   const rangeSlider = container.querySelector('#priceRangeSlider');
-  if (rangeSlider) rangeSlider.addEventListener('input', emitFilter);
+  if (rangeSlider) rangeSlider.addEventListener('input', ()=>{ priceActive=true; emitFilter(); });
+  const clearBtn = container.querySelector('#priceClearBtn');
+  if (clearBtn) clearBtn.addEventListener('click', ()=>{ priceActive=false; const s=container.querySelector('#priceRangeSlider'); if(s) s.value=0; emitFilter(); });
 
   // Smooth scroll ao clicar na categoria
   const pills = container.querySelectorAll('.category-pill');
