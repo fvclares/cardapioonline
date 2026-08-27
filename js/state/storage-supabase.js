@@ -4,7 +4,7 @@
  * Compatível com a API anterior (window.storage)
  */
 
-import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, neighborhoodsApi, ordersApi, settingsApi } from '../lib/supabase.js';
+import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, neighborhoodsApi, ordersApi, settingsApi, pizzaSizesApi, productSizePricesApi } from '../lib/supabase.js';
 
 // Normaliza campos Supabase -> formato legado do frontend
 function normalizeProduct(p) {
@@ -36,7 +36,9 @@ class SupabaseStorageEngine {
       products: null,
       addonGroups: null,
       neighborhoods: null,
-      settings: null
+      settings: null,
+      pizzaSizes: null,
+      productSizePrices: null
     };
   }
 
@@ -49,13 +51,15 @@ class SupabaseStorageEngine {
     }
     
     try {
-      const [storeResult, categoriesResult, productsResult, addonsResult, neighborhoodsResult, settingsResult] = await Promise.all([
+      const [storeResult, categoriesResult, productsResult, addonsResult, neighborhoodsResult, settingsResult, pizzaSizesResult, sizePricesResult] = await Promise.all([
         storeApi.getById(storeId),
         categoriesApi.list(storeId),
         productsApi.listAdmin(storeId),
         addonGroupsApi.list(storeId),
         neighborhoodsApi.list(storeId),
-        settingsApi.get(storeId)
+        settingsApi.get(storeId),
+        pizzaSizesApi.listAll(storeId).catch(()=>({data:[]})),
+        productSizePricesApi.listByStore(storeId).catch(()=>({data:[]}))
       ]);
 
       if (storeResult.error) throw storeResult.error;
@@ -100,6 +104,8 @@ class SupabaseStorageEngine {
       }
       this._dataCache.neighborhoods = neighborhoodsResult.data || [];
       this._dataCache.settings = settingsResult.data || {};
+      this._dataCache.pizzaSizes = pizzaSizesResult?.data || [];
+      this._dataCache.productSizePrices = sizePricesResult?.data || [];
 
       console.log('✅ SupabaseStorageEngine inicializado para store:', storeId);
       this.emitChange('data_ready', this._dataCache);
@@ -244,6 +250,17 @@ class SupabaseStorageEngine {
   getSettings() {
     if (this.useLocalFallback) return {};
     return this._dataCache.settings || {};
+  }
+
+  getPizzaSizes() {
+    if (this.useLocalFallback) return [];
+    return this._dataCache.pizzaSizes || [];
+  }
+  getProductSizePrices(productId) {
+    if (this.useLocalFallback) return [];
+    const all = this._dataCache.productSizePrices || [];
+    if (productId) return all.filter(r => r.product_id === productId);
+    return all;
   }
 
   // --- Customer (sempre local, por dispositivo) ---

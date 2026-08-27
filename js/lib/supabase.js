@@ -440,6 +440,56 @@ export const settingsApi = {
   }
 };
 
+// Pizza Sizes (tamanhos por loja)
+export const pizzaSizesApi = {
+  async list(storeId) {
+    const { data, error } = await supabase.from('pizza_sizes').select('*').eq('store_id', storeId).eq('is_active', true).order('display_order');
+    return { data, error };
+  },
+  async listAll(storeId) {
+    const { data, error } = await supabase.from('pizza_sizes').select('*').eq('store_id', storeId).order('display_order');
+    return { data, error };
+  },
+  async create(storeId, payload) {
+    const { data, error } = await supabase.from('pizza_sizes').insert([{ ...payload, store_id: storeId }]).select().single();
+    return { data, error };
+  },
+  async update(id, updates) {
+    const { data, error } = await supabase.from('pizza_sizes').update(updates).eq('id', id).select().single();
+    return { data, error };
+  },
+  async delete(id) {
+    const { error } = await supabase.from('pizza_sizes').delete().eq('id', id);
+    return { error };
+  }
+};
+
+export const productSizePricesApi = {
+  async listByProduct(productId) {
+    const { data, error } = await supabase.from('product_size_prices').select('*').eq('product_id', productId);
+    return { data, error };
+  },
+  async listByStore(storeId) {
+    const { data, error } = await supabase.from('product_size_prices').select('*, pizza_sizes!inner(store_id)').eq('pizza_sizes.store_id', storeId);
+    // fallback sem join se não funcionar
+    if (error) {
+      const { data: sizes } = await supabase.from('pizza_sizes').select('id').eq('store_id', storeId);
+      const ids = (sizes||[]).map(s=>s.id);
+      if (!ids.length) return { data: [], error: null };
+      return await supabase.from('product_size_prices').select('*').in('size_id', ids);
+    }
+    return { data, error };
+  },
+  async upsert(productId, sizeId, price) {
+    const { data, error } = await supabase.from('product_size_prices').upsert({ product_id: productId, size_id: sizeId, price }, { onConflict: 'product_id,size_id' }).select().single();
+    return { data, error };
+  },
+  async deleteByProduct(productId) {
+    const { error } = await supabase.from('product_size_prices').delete().eq('product_id', productId);
+    return { error };
+  }
+};
+
 // Storage (imagens)
 export const storageApi = {
   async uploadProductImage(storeId, file, fileName) {

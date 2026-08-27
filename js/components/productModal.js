@@ -1,7 +1,6 @@
 /**
  * Componente: Modal de Personalização e Adição de Produto à Sacola
- * Suporta: Escolha de Tamanho (Média, Grande, Gigante), Pizza Meio a Meio (2 Sabores), Bordas e Extras.
- * Compatível com file:// e http://
+ * Suporta: Tamanhos definidos pela loja (P/M/G) com preço por pizza/tamanho e divisão em até 4 sabores
  */
 
 function setupProductModal() {
@@ -10,36 +9,58 @@ function setupProductModal() {
 
   let currentProduct = null;
   let selectedSize = null;
-  let isHalfHalf = false;
-  let selectedSecondFlavor = null;
+  let selectedFlavors = []; // adicionais além do principal
   let selectedCrust = null;
   let selectedExtras = [];
   let quantity = 1;
   let observation = '';
 
+  function getPizzaSizes() {
+    const fromApp = window.appState?.pizzaSizes || [];
+    const fromStorage = window.storage?.getPizzaSizes?.() || [];
+    const list = (fromApp.length ? fromApp : fromStorage).filter(s=> s.is_active!==false).sort((a,b)=>(a.display_order||0)-(b.display_order||0));
+    return list;
+  }
+  function getPriceForProductSize(product, size) {
+    if (!size) return Number(product.price || product.base_price || 0);
+    // tenta product_size_prices
+    const allPrices = window.appState?.productSizePrices || window.storage?.getProductSizePrices?.() || [];
+    const found = allPrices.find(p=> p.product_id===product.id && p.size_id===size.id);
+    if (found) return Number(found.price);
+    // fallback para product.price (ou base_price) se não houver preço por tamanho
+    return Number(product.price || product.base_price || 0);
+  }
+
   function openModal(product) {
     currentProduct = product;
     const addonGroups = window.appState.addonGroups || {};
-    const sizeGroup = addonGroups.sizes;
     const crustGroup = addonGroups.crusts;
     const extraGroup = addonGroups.extras;
     const cs = window.customerService;
+    const pizzaSizes = getPizzaSizes();
+    const usePizzaSizes = product.is_pizza && pizzaSizes.length > 0;
+    const sizeGroup = addonGroups.sizes; // fallback legado
 
-    // Tamanho padrão (Grande)
-    selectedSize = sizeGroup?.options.find(s => s.default) || sizeGroup?.options[1] || null;
-    isHalfHalf = false;
-    selectedSecondFlavor = null;
+    // Tamanho padrão
+    if (usePizzaSizes) {
+      selectedSize = pizzaSizes[0] || null;
+    } else {
+      selectedSize = sizeGroup?.options.find(s => s.default) || sizeGroup?.options[1] || null;
+    }
+    selectedFlavors = [];
     selectedCrust = null;
     selectedExtras = [];
     quantity = 1;
     observation = '';
 
-    // Filtra todas as pizzas disponíveis para a opção meio a meio
     const allPizzas = (window.appState.products || []).filter(p => p.is_pizza && p.available !== false && p.id !== product.id);
+
+    // Preço inicial para display
+    const initialPrice = usePizzaSizes ? getPriceForProductSize(product, selectedSize) : Number(product.price || 0);
 
     modalContent.innerHTML = `
       <div class="modal-header">
-        <div class="modal-title">${product.name}</div>
+        <div class="modal-title">${product.codigo ? '#' + String(product.codigo).padStart(3,'0') + ' ' : ''}${product.name}</div>
         <button class="modal-close-btn" id="btnCloseProductModal">✕</button>
       </div>
 
@@ -50,8 +71,30 @@ function setupProductModal() {
           ${product.description || ''}
         </p>
 
-        <!-- Seleção de Tamanho (Se for Pizza) -->
-        ${product.is_pizza && sizeGroup ? `
+        <!-- Tamanhos (loja) -->
+        ${product.is_pizza ? (
+          usePizzaSizes ? `
+          <div class="addon-group">
+            <div class="addon-group-header">
+              <span class="addon-group-title">📏 Escolha o Tamanho</span>
+              <span class="addon-group-required">Obrigatório</span>
+            </div>
+            <div class="addon-options-list">
+              ${pizzaSizes.map(s=>{
+                const price = getPriceForProductSize(product, s);
+                const isSel = s.id===selectedSize?.id;
+                return `
+                <div class="addon-option size-option ${isSel?'selected':''}" data-size-id="${s.id}">
+                  <div class="addon-option-info">
+                    <input type="radio" name="pizza_size" value="${s.id}" ${isSel?'checked':''} style="width:auto;" />
+                    <span style="font-size:0.88rem; font-weight:600;">${s.name} (${s.slices} fatias) - até ${s.max_flavors} sabor${s.max_flavors>1?'es':''}</span>
+                  </div>
+                  <span class="addon-option-price">${cs ? cs.formatCurrency(price) : 'R$ '+price}</span>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>
+          ` : (sizeGroup ? `
           <div class="addon-group">
             <div class="addon-group-header">
               <span class="addon-group-title">📏 ${sizeGroup.title}</span>
@@ -71,10 +114,21 @@ function setupProductModal() {
               `).join('')}
             </div>
           </div>
-        ` : ''}
+          ` : '')
+        ) : ''}
 
-        <!-- Opção Meio a Meio (2 Sabores) -->
-        ${product.is_pizza && allPizzas.length > 0 ? `
+        <!-- Divisão em sabores -->
+        ${product.is_pizza && usePizzaSizes ? `
+          <div class="addon-group" id="flavorsGroup" style="${(selectedSize?.max_flavors||1) > 1 ? 'display:block;' : 'display:none;'}">
+            <div class="addon-group-header">
+              <span class="addon-group-title">🍕 Dividir sabores</span>
+              <span style="font-size:0.75rem; color:var(--text-muted);">até ${selectedSize?.max_flavors||1} sabores</span>
+            </div>
+            <div id="flavorsSelectors">
+              ${buildFlavorSelectors(selectedSize, allPizzas, cs)}
+            </div>
+          </div>
+        ` : (product.is_pizza && allPizzas.length > 0 && !usePizzaSizes ? `
           <div class="addon-group" id="halfHalfContainer" style="${selectedSize?.allows_half_half !== false ? 'display: block;' : 'display: none;'}">
             <div style="background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.9rem; margin-bottom: 0.75rem;">
               <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
@@ -82,30 +136,22 @@ function setupProductModal() {
                   <input type="checkbox" id="checkHalfHalf" style="width: auto;" />
                   <div>
                     <div style="font-weight: 700; font-size: 0.9rem;">🍕 Dividir em 2 Sabores? (Meio a Meio)</div>
-                    <div style="font-size: 0.78rem; color: var(--text-muted);">Escolha um segundo sabor para a outra metade da pizza</div>
+                    <div style="font-size: 0.78rem; color: var(--text-muted);">Escolha um segundo sabor para a outra metade</div>
                   </div>
                 </div>
               </label>
-
               <div id="secondFlavorWrapper" style="display: none; margin-top: 0.85rem; border-top: 1px solid var(--border-light); padding-top: 0.85rem;">
                 <label class="form-label" style="margin-bottom: 0.4rem; display: block;">Selecione o 2º Sabor:</label>
                 <select id="secondFlavorSelect">
-                  <option value="">-- Escolha a outra metade da pizza --</option>
-                  ${allPizzas.map(p => `
-                    <option value="${p.id}" data-price="${p.price}">
-                      ${p.name} (${cs ? cs.formatCurrency(p.price) : 'R$ ' + p.price})
-                    </option>
-                  `).join('')}
+                  <option value="">-- Escolha a outra metade --</option>
+                  ${allPizzas.map(p => `<option value="${p.id}">${p.name} (${cs ? cs.formatCurrency(getPriceForProductSize(p, selectedSize)) : 'R$ '+getPriceForProductSize(p, selectedSize)})</option>`).join('')}
                 </select>
-                <div style="font-size: 0.75rem; color: var(--secondary); margin-top: 0.35rem;">
-                  ℹ️ O valor base será cobrado pelo sabor de maior valor.
-                </div>
               </div>
             </div>
           </div>
-        ` : ''}
+        ` : '')}
 
-        <!-- Bordas Recheadas -->
+        <!-- Bordas -->
         ${product.has_crusts && crustGroup ? `
           <div class="addon-group">
             <div class="addon-group-header">
@@ -126,7 +172,7 @@ function setupProductModal() {
           </div>
         ` : ''}
 
-        <!-- Adicionais Extras -->
+        <!-- Extras -->
         ${product.has_extras && extraGroup ? `
           <div class="addon-group">
             <div class="addon-group-header">
@@ -147,12 +193,11 @@ function setupProductModal() {
           </div>
         ` : ''}
 
-        <!-- Observações do Item -->
         <div class="addon-group">
           <div class="addon-group-header">
             <span class="addon-group-title">💬 Observações do Item</span>
           </div>
-          <textarea id="productObservation" rows="2" placeholder="Ex: Sem cebola, massa bem assada, tirar azeitonas..." style="resize: none;"></textarea>
+          <textarea id="productObservation" rows="2" placeholder="Ex: Sem cebola, massa bem assada..." style="resize: none;"></textarea>
         </div>
       </div>
 
@@ -162,18 +207,43 @@ function setupProductModal() {
           <span class="qty-number" id="modalQtyDisplay">1</span>
           <button class="btn-qty" id="btnQtyPlus">+</button>
         </div>
-
         <button class="btn btn-primary btn-block" id="btnConfirmAddToCart">
           <span>Adicionar</span>
-          <span id="btnModalPriceTotal">${cs ? cs.formatCurrency(product.price) : 'R$ ' + product.price}</span>
+          <span id="btnModalPriceTotal">${cs ? cs.formatCurrency(initialPrice) : 'R$ ' + initialPrice}</span>
         </button>
       </div>
     `;
 
-    bindModalEvents(product, sizeGroup, crustGroup, extraGroup, allPizzas);
+    bindModalEvents(product, sizeGroup, crustGroup, extraGroup, allPizzas, pizzaSizes, usePizzaSizes);
 
     modalBackdrop.classList.add('active');
     document.body.style.overflow = 'hidden';
+  }
+
+  function buildFlavorSelectors(size, allPizzas, cs) {
+    if (!size || size.max_flavors <= 1) return '<p style="font-size:0.8rem; color:var(--text-muted);">Este tamanho não permite divisão.</p>';
+    let html = '<p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;">Selecione os sabores adicionais:</p>';
+    for (let i=1; i < size.max_flavors; i++) {
+      html += `
+        <div style="margin-bottom:0.5rem;">
+          <label class="form-label" style="font-size:0.8rem;">${i+1}º sabor:</label>
+          <select class="flavor-select" data-index="${i}" style="width:100%;">
+            <option value="">-- não dividir --</option>
+            ${allPizzas.map(p => `<option value="${p.id}">${p.name} (${cs ? cs.formatCurrency(getPriceForProductSize(p, size)) : 'R$ '+getPriceForProductSize(p, size)})</option>`).join('')}
+          </select>
+        </div>
+      `;
+    }
+    html += '<div style="font-size:0.75rem; color:var(--secondary); margin-top:0.3rem;">ℹ️ Valor cobrado será o maior preço entre os sabores no tamanho escolhido.</div>';
+    return html;
+  }
+
+  function getPriceForProductSize(product, size) {
+    if (!size) return Number(product.price || product.base_price || 0);
+    const allPrices = window.appState?.productSizePrices || window.storage?.getProductSizePrices?.() || [];
+    const found = allPrices.find(p=> p.product_id===product.id && p.size_id===size.id);
+    if (found) return Number(found.price);
+    return Number(product.price || product.base_price || 0);
   }
 
   function closeModal() {
@@ -181,7 +251,7 @@ function setupProductModal() {
     document.body.style.overflow = '';
   }
 
-  function bindModalEvents(product, sizeGroup, crustGroup, extraGroup, allPizzas) {
+  function bindModalEvents(product, sizeGroup, crustGroup, extraGroup, allPizzas, pizzaSizes, usePizzaSizes) {
     const cs = window.customerService;
     const btnClose = modalContent.querySelector('#btnCloseProductModal');
     if (btnClose) btnClose.addEventListener('click', closeModal);
@@ -192,149 +262,126 @@ function setupProductModal() {
     const priceDisplay = modalContent.querySelector('#btnModalPriceTotal');
     const obsInput = modalContent.querySelector('#productObservation');
 
-    // Borda default
     if (product.has_crusts && crustGroup) {
       selectedCrust = crustGroup.options.find(o => o.price === 0) || null;
     }
 
-    // Seleção de Tamanho
-    const halfHalfContainer = modalContent.querySelector('#halfHalfContainer');
-    const checkHalfHalf = modalContent.querySelector('#checkHalfHalf');
-    const secondFlavorWrapper = modalContent.querySelector('#secondFlavorWrapper');
-    const secondFlavorSelect = modalContent.querySelector('#secondFlavorSelect');
-
-    modalContent.querySelectorAll('.size-option').forEach(option => {
-      option.addEventListener('click', () => {
-        modalContent.querySelectorAll('.size-option').forEach(o => {
-          o.classList.remove('selected');
-          const radio = o.querySelector('input[type="radio"]');
-          if (radio) radio.checked = false;
-        });
-        option.classList.add('selected');
-        const radio = option.querySelector('input[type="radio"]');
-        if (radio) radio.checked = true;
-
-        const sizeId = option.dataset.sizeId;
-        selectedSize = sizeGroup.options.find(s => s.id === sizeId) || null;
-
-        if (halfHalfContainer) {
-          if (selectedSize && selectedSize.allows_half_half === false) {
-            halfHalfContainer.style.display = 'none';
-            if (checkHalfHalf) checkHalfHalf.checked = false;
-            if (secondFlavorWrapper) secondFlavorWrapper.style.display = 'none';
-            isHalfHalf = false;
-            selectedSecondFlavor = null;
-          } else {
-            halfHalfContainer.style.display = 'block';
+    // Tamanhos pizza nova
+    if (usePizzaSizes) {
+      modalContent.querySelectorAll('.size-option').forEach(option => {
+        option.addEventListener('click', () => {
+          modalContent.querySelectorAll('.size-option').forEach(o=>{ o.classList.remove('selected'); const r=o.querySelector('input'); if(r) r.checked=false; });
+          option.classList.add('selected'); const r=option.querySelector('input'); if(r) r.checked=true;
+          const sizeId = option.dataset.sizeId;
+          selectedSize = pizzaSizes.find(s=> s.id===sizeId) || null;
+          selectedFlavors = [];
+          // rebuild flavor selectors
+          const cont = modalContent.querySelector('#flavorsSelectors');
+          const grp = modalContent.querySelector('#flavorsGroup');
+          if (cont && grp) {
+            cont.innerHTML = buildFlavorSelectors(selectedSize, allPizzas, cs);
+            grp.style.display = (selectedSize?.max_flavors||1) > 1 ? 'block' : 'none';
+            bindFlavorSelects();
           }
-        }
-
-        updateModalTotal();
+          updateModalTotal();
+        });
       });
-    });
+      bindFlavorSelects();
+    } else {
+      // legado sizeGroup
+      const halfHalfContainer = modalContent.querySelector('#halfHalfContainer');
+      const checkHalfHalf = modalContent.querySelector('#checkHalfHalf');
+      const secondFlavorWrapper = modalContent.querySelector('#secondFlavorWrapper');
+      const secondFlavorSelect = modalContent.querySelector('#secondFlavorSelect');
+      modalContent.querySelectorAll('.size-option').forEach(option => {
+        option.addEventListener('click', () => {
+          modalContent.querySelectorAll('.size-option').forEach(o => { o.classList.remove('selected'); const radio=o.querySelector('input'); if(radio) radio.checked=false; });
+          option.classList.add('selected'); const radio=option.querySelector('input'); if(radio) radio.checked=true;
+          const sizeId = option.dataset.sizeId;
+          selectedSize = sizeGroup.options.find(s => s.id === sizeId) || null;
+          if (halfHalfContainer) {
+            if (selectedSize && selectedSize.allows_half_half === false) {
+              halfHalfContainer.style.display = 'none';
+              if (checkHalfHalf) checkHalfHalf.checked = false;
+              if (secondFlavorWrapper) secondFlavorWrapper.style.display = 'none';
+              selectedFlavors = [];
+            } else { halfHalfContainer.style.display = 'block'; }
+          }
+          updateModalTotal();
+        });
+      });
+      if (checkHalfHalf) {
+        checkHalfHalf.addEventListener('change', (e) => {
+          const isHalf = e.target.checked;
+          if (secondFlavorWrapper) secondFlavorWrapper.style.display = isHalf ? 'block' : 'none';
+          if (!isHalf) selectedFlavors = [];
+          else if (secondFlavorSelect && secondFlavorSelect.value) {
+            const pf = allPizzas.find(p=> p.id===secondFlavorSelect.value);
+            selectedFlavors = pf ? [pf] : [];
+          }
+          updateModalTotal();
+        });
+      }
+      if (secondFlavorSelect) {
+        secondFlavorSelect.addEventListener('change', (e) => {
+          const pf = allPizzas.find(p=> p.id===e.target.value);
+          selectedFlavors = pf ? [pf] : [];
+          updateModalTotal();
+        });
+      }
+    }
 
-    // Meio a Meio Toggle
-    if (checkHalfHalf) {
-      checkHalfHalf.addEventListener('change', (e) => {
-        isHalfHalf = e.target.checked;
-        if (secondFlavorWrapper) {
-          secondFlavorWrapper.style.display = isHalfHalf ? 'block' : 'none';
-        }
-        if (!isHalfHalf) {
-          selectedSecondFlavor = null;
-        } else if (secondFlavorSelect && secondFlavorSelect.value) {
-          selectedSecondFlavor = allPizzas.find(p => p.id === secondFlavorSelect.value) || null;
-        }
-        updateModalTotal();
+    function bindFlavorSelects(){
+      modalContent.querySelectorAll('.flavor-select').forEach(sel=>{
+        sel.addEventListener('change', ()=>{
+          selectedFlavors = [];
+          modalContent.querySelectorAll('.flavor-select').forEach(s=>{
+            if(s.value){ const pf=allPizzas.find(p=>p.id===s.value); if(pf) selectedFlavors.push(pf); }
+          });
+          updateModalTotal();
+        });
       });
     }
 
-    if (secondFlavorSelect) {
-      secondFlavorSelect.addEventListener('change', (e) => {
-        const pId = e.target.value;
-        selectedSecondFlavor = allPizzas.find(p => p.id === pId) || null;
-        updateModalTotal();
-      });
-    }
-
-    // Seleção de borda
+    // Bordas
     modalContent.querySelectorAll('.crust-option').forEach(option => {
       option.addEventListener('click', () => {
-        modalContent.querySelectorAll('.crust-option').forEach(o => {
-          o.classList.remove('selected');
-          const radio = o.querySelector('input[type="radio"]');
-          if (radio) radio.checked = false;
-        });
-        option.classList.add('selected');
-        const radio = option.querySelector('input[type="radio"]');
-        if (radio) radio.checked = true;
-
+        modalContent.querySelectorAll('.crust-option').forEach(o => { o.classList.remove('selected'); const radio=o.querySelector('input'); if(radio) radio.checked=false; });
+        option.classList.add('selected'); const radio=option.querySelector('input'); if(radio) radio.checked=true;
         const crustId = option.dataset.crustId;
         selectedCrust = crustGroup.options.find(o => o.id === crustId) || null;
         updateModalTotal();
       });
     });
 
-    // Seleção de extras
+    // Extras
     modalContent.querySelectorAll('.extra-option').forEach(option => {
       option.addEventListener('click', (e) => {
         const checkbox = option.querySelector('input[type="checkbox"]');
-        if (e.target !== checkbox) {
-          checkbox.checked = !checkbox.checked;
-        }
-
-        if (checkbox.checked) {
-          option.classList.add('selected');
-        } else {
-          option.classList.remove('selected');
-        }
-
+        if (e.target !== checkbox) checkbox.checked = !checkbox.checked;
+        if (checkbox.checked) option.classList.add('selected'); else option.classList.remove('selected');
         const extraId = option.dataset.extraId;
         const extraOpt = extraGroup.options.find(o => o.id === extraId);
-        if (checkbox.checked && extraOpt) {
-          if (!selectedExtras.some(e => e.id === extraId)) {
-            selectedExtras.push(extraOpt);
-          }
-        } else {
-          selectedExtras = selectedExtras.filter(e => e.id !== extraId);
-        }
+        if (checkbox.checked && extraOpt) { if (!selectedExtras.some(ee=>ee.id===extraId)) selectedExtras.push(extraOpt); }
+        else { selectedExtras = selectedExtras.filter(ee=> ee.id !== extraId); }
         updateModalTotal();
       });
     });
 
-    // Quantidade
-    btnMinus.addEventListener('click', () => {
-      if (quantity > 1) {
-        quantity--;
-        qtyDisplay.textContent = quantity;
-        updateModalTotal();
-      }
-    });
-
-    btnPlus.addEventListener('click', () => {
-      quantity++;
-      qtyDisplay.textContent = quantity;
-      updateModalTotal();
-    });
+    btnMinus.addEventListener('click', () => { if (quantity > 1) { quantity--; qtyDisplay.textContent = quantity; updateModalTotal(); } });
+    btnPlus.addEventListener('click', () => { quantity++; qtyDisplay.textContent = quantity; updateModalTotal(); });
 
     function calculateUnitPrice() {
-      let base = Number(product.price);
-      if (isHalfHalf && selectedSecondFlavor) {
-        base = Math.max(Number(product.price), Number(selectedSecondFlavor.price));
+      let base = getPriceForProductSize(product, selectedSize);
+      if (selectedFlavors.length) {
+        let maxPrice = base;
+        selectedFlavors.forEach(f=>{ const pr=getPriceForProductSize(f, selectedSize); if(pr>maxPrice) maxPrice=pr; });
+        base = maxPrice;
       }
-
       let unit = base;
-      if (selectedSize && typeof selectedSize.price_diff === 'number') {
-        unit += selectedSize.price_diff;
-      }
-      if (selectedCrust && selectedCrust.price) {
-        unit += Number(selectedCrust.price);
-      }
-      if (selectedExtras && selectedExtras.length > 0) {
-        selectedExtras.forEach(extra => {
-          unit += Number(extra.price || 0);
-        });
-      }
+      if (!usePizzaSizes && selectedSize && typeof selectedSize.price_diff === 'number') unit += selectedSize.price_diff;
+      if (selectedCrust && selectedCrust.price) unit += Number(selectedCrust.price);
+      if (selectedExtras && selectedExtras.length) selectedExtras.forEach(extra=> unit += Number(extra.price||0));
       return unit;
     }
 
@@ -344,35 +391,29 @@ function setupProductModal() {
       priceDisplay.textContent = cs ? cs.formatCurrency(total) : 'R$ ' + total;
     }
 
-    // Botão Adicionar
     const btnAdd = modalContent.querySelector('#btnConfirmAddToCart');
     btnAdd.addEventListener('click', () => {
-      if (isHalfHalf && !selectedSecondFlavor) {
-        alert('Por favor, selecione o 2º sabor da pizza.');
-        if (secondFlavorSelect) secondFlavorSelect.focus();
-        return;
-      }
-
+      if (selectedFlavors.length && selectedFlavors.some(f=>!f)) { alert('Selecione os sabores corretamente.'); return; }
       observation = obsInput ? obsInput.value : '';
+      // Normaliza para orderService (primeiro sabor extra como secondFlavor para compatibilidade)
+      const secondFlavor = selectedFlavors[0] || null;
       window.appState.addItem({
         product,
-        size: product.is_pizza ? selectedSize : null,
-        secondFlavor: isHalfHalf ? selectedSecondFlavor : null,
-        quantity,
-        crust: selectedCrust,
-        extras: selectedExtras,
-        observation
+        size: selectedSize,
+        secondFlavor: secondFlavor,
+        quantity, crust: selectedCrust, extras: selectedExtras, observation,
+        _allFlavors: selectedFlavors // para futuro 3-4 sabores
       });
+      // Se tiver 3-4 sabores, adiciona observação
+      if (selectedFlavors.length > 1) {
+        const extraNames = selectedFlavors.slice(1).map(f=> f.name).join(', ');
+        // já está em secondFlavor, extras sabores vão como observação
+      }
       closeModal();
     });
   }
 
-  // Fecha modal ao clicar fora
-  modalBackdrop.addEventListener('click', (e) => {
-    if (e.target === modalBackdrop) {
-      closeModal();
-    }
-  });
+  modalBackdrop.addEventListener('click', (e) => { if (e.target === modalBackdrop) closeModal(); });
 
   return { openModal, closeModal };
 }

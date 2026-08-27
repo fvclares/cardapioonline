@@ -3,6 +3,17 @@
  * Compatível com file:// e http://
  */
 
+function getDisplayPrice(product){
+  if (!product.is_pizza) return Number(product.price||0);
+  const sizes = window.appState?.pizzaSizes || window.storage?.getPizzaSizes?.() || [];
+  if (!sizes.length) return Number(product.price||0);
+  const prices = window.appState?.productSizePrices || window.storage?.getProductSizePrices?.(product.id) || [];
+  // filtra preços deste produto
+  const myPrices = Array.isArray(prices) ? prices.filter(p=> p.product_id===product.id) : [];
+  if (myPrices.length) return Math.min(...myPrices.map(p=>Number(p.price)));
+  // fallback para product.price
+  return Number(product.price||0);
+}
 function renderProductSections(container, searchQuery = '', onSelectProduct) {
   const categories = (window.appState.categories || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
   const products = (window.appState.products || []).filter(p => p.available !== false).slice().sort((a,b)=> (a.codigo||9999)-(b.codigo||9999) || (a.order||0)-(b.order||0));
@@ -47,7 +58,7 @@ function renderProductSections(container, searchQuery = '', onSelectProduct) {
                 <div class="product-price-bar">
                   <div>
                     <span class="product-price-prefix">A partir de</span><br/>
-                    <span class="product-price">${cs ? cs.formatCurrency(product.price) : 'R$ ' + product.price}</span>
+                    <span class="product-price">${cs ? cs.formatCurrency(getDisplayPrice(product)) : 'R$ ' + getDisplayPrice(product)}</span>
                   </div>
                   <button class="btn-add-circle" title="Adicionar à sacola">+</button>
                 </div>

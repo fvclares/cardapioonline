@@ -149,6 +149,10 @@
           <span class="admin-nav-icon">📋</span>
           <span>Pedidos</span>
         </button>
+        <button class="admin-nav-item" data-tab="tab-sizes">
+          <span class="admin-nav-icon">📏</span>
+          <span>Tamanhos Pizza</span>
+        </button>
         <button class="admin-nav-item" data-tab="tab-addons">
           <span class="admin-nav-icon">🧀</span>
           <span>Bordas & Extras</span>
@@ -383,6 +387,22 @@
           </div>
         </div>
 
+        <!-- TAB: Tamanhos Pizza -->
+        <div class="tab-panel" id="tab-sizes">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h2 class="admin-card-title">📏 Tamanhos de Pizza</h2>
+              <button class="btn btn-primary btn-sm" id="btnNewPizzaSize">
+                + Novo Tamanho
+              </button>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 1.25rem; font-size: 0.9rem;">
+              Defina os tamanhos da loja (P, M, G, Família). Para cada tamanho configure até quantos sabores pode dividir.
+            </p>
+            <div id="pizzaSizesListContainer"></div>
+          </div>
+        </div>
+
         <!-- TAB: Bordas & Extras -->
         <div class="tab-panel" id="tab-addons">
           <div class="admin-card">
@@ -524,6 +544,12 @@
             </div>
           </div>
 
+          <div id="prodSizePricesContainer" style="display:none; margin-bottom: 1rem; background: var(--bg-input); padding: 0.85rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
+            <div class="form-label" style="margin-bottom: 0.5rem;">Preços por Tamanho (pizza)</div>
+            <div id="prodSizePricesFields"></div>
+            <div class="form-help">Defina o preço para cada tamanho. Deixe vazio para indisponível naquele tamanho.</div>
+          </div>
+
           <div class="form-group" style="margin-bottom: 1rem;">
             <label class="form-label">Descrição / Ingredientes</label>
             <textarea id="prodDescriptionInput" rows="2" placeholder="Molho caseiro, mussarela especial, calabresa..." style="resize: none;"></textarea>
@@ -538,7 +564,11 @@
           </div>
 
           <div style="background: var(--bg-input); padding: 0.85rem; border-radius: var(--radius-md); border: 1px solid var(--border); margin-bottom: 1rem;">
-            <div class="form-label" style="margin-bottom: 0.5rem;">Opções de Personalização:</div>
+            <div class="form-label" style="margin-bottom: 0.5rem;">Tipo de Produto:</div>
+            <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; margin-bottom: 0.4rem; cursor: pointer;">
+              <input type="checkbox" id="prodIsPizzaInput" style="width: auto;" />
+              É Pizza (usa tamanhos e permite dividir sabores)
+            </label>
             <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; margin-bottom: 0.4rem; cursor: pointer;">
               <input type="checkbox" id="prodHasCrustsInput" style="width: auto;" />
               Permite escolher Borda Recheada (Catupiry, Cheddar, etc.)
@@ -686,7 +716,56 @@
     </div>
   </div>
 
+  <!-- Modal: Tamanho Pizza -->
+  <div id="pizzaSizeModalBackdrop" class="modal-backdrop">
+    <div class="modal-sheet" style="max-width: 480px;">
+      <div class="modal-header">
+        <div class="modal-title" id="pizzaSizeModalTitle">Novo Tamanho</div>
+        <button class="modal-close-btn" id="btnClosePizzaSizeModal">✕</button>
+      </div>
+      <form id="pizzaSizeForm">
+        <div class="modal-body">
+          <input type="hidden" id="pizzaSizeEditId" />
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label">Nome *</label>
+            <input type="text" id="pizzaSizeNameInput" placeholder="Ex: P, M, G, Família" required />
+          </div>
+          <div class="form-grid form-grid-2" style="margin-bottom: 1rem;">
+            <div class="form-group">
+              <label class="form-label">Fatias</label>
+              <input type="number" id="pizzaSizeSlicesInput" value="8" min="1" max="16" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Máx. sabores *</label>
+              <select id="pizzaSizeMaxFlavorsInput" required>
+                <option value="1">1 sabor</option>
+                <option value="2">2 sabores</option>
+                <option value="3">3 sabores</option>
+                <option value="4">4 sabores</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-grid form-grid-2" style="margin-bottom: 1rem;">
+            <div class="form-group">
+              <label class="form-label">Ordem</label>
+              <input type="number" id="pizzaSizeOrderInput" value="1" min="1" />
+            </div>
+            <div class="form-group" style="display:flex; align-items:flex-end;">
+              <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                <input type="checkbox" id="pizzaSizeActiveInput" checked style="width:auto;" /> Ativo
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btnCancelPizzaSize">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Tamanho</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Scripts (Module) -->
-  <script type="module" src="js/admin-supabase.js?v=14"></script>
+  <script type="module" src="js/admin-supabase.js?v=15"></script>
 </body>
 </html>

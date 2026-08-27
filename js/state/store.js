@@ -9,6 +9,8 @@ class StoreState {
     this.categories = [];
     this.products = [];
     this.addonGroups = {};
+    this.pizzaSizes = [];
+    this.productSizePrices = [];
     this.customer = null;
     this.listeners = [];
     this._refreshing = false;
@@ -74,6 +76,8 @@ class StoreState {
         this.categories = storageEngine.getCategories();
         this.products = storageEngine.getProducts();
         this.addonGroups = storageEngine.getAddonGroups();
+        this.pizzaSizes = [];
+        this.productSizePrices = [];
         this.customer = storageEngine.getCustomerProfile();
       } else {
         // Supabase: usa cache local se disponível, senão busca
@@ -100,22 +104,28 @@ class StoreState {
     try {
       // Se for Supabase, busca dados
       if (!storageEngine.useLocalFallback && storageEngine.storeId) {
-        const [store, categories, products, addonGroups] = await Promise.all([
+        const [store, categories, products, addonGroups, pizzaSizes, sizePrices] = await Promise.all([
           storageEngine.getStore(),
           storageEngine.getCategories(),
           storageEngine.getProducts(),
-          storageEngine.getAddonGroups()
+          storageEngine.getAddonGroups(),
+          storageEngine.getPizzaSizes ? storageEngine.getPizzaSizes() : [],
+          storageEngine.getProductSizePrices ? storageEngine.getProductSizePrices() : []
         ]);
         this.store = store || this.store;
         this.categories = categories || this.categories;
         this.products = products || this.products;
         this.addonGroups = addonGroups || this.addonGroups;
+        this.pizzaSizes = pizzaSizes || this.pizzaSizes;
+        this.productSizePrices = sizePrices || this.productSizePrices;
       } else {
         // Fallback local
         this.store = storageEngine.getStore();
         this.categories = storageEngine.getCategories();
         this.products = storageEngine.getProducts();
         this.addonGroups = storageEngine.getAddonGroups();
+        this.pizzaSizes = [];
+        this.productSizePrices = [];
       }
       this.customer = storageEngine.getCustomerProfile();
       
@@ -140,16 +150,20 @@ class StoreState {
     if (!storageEngine) return;
     
     try {
-      const [store, categories, products, addonGroups] = await Promise.all([
+      const [store, categories, products, addonGroups, pizzaSizes, sizePrices] = await Promise.all([
         storageEngine.getStore(),
         storageEngine.getCategories(),
         storageEngine.getProducts(),
-        storageEngine.getAddonGroups()
+        storageEngine.getAddonGroups(),
+        storageEngine.getPizzaSizes ? storageEngine.getPizzaSizes() : [],
+        storageEngine.getProductSizePrices ? storageEngine.getProductSizePrices() : []
       ]);
       this.store = store || this.store;
       this.categories = categories || this.categories;
       this.products = products || this.products;
       this.addonGroups = addonGroups || this.addonGroups;
+      this.pizzaSizes = pizzaSizes || this.pizzaSizes;
+      this.productSizePrices = sizePrices || this.productSizePrices;
     } catch (err) {
       console.warn('_refreshFromStorage failed:', err);
     }
@@ -179,24 +193,43 @@ class StoreState {
       quantity = 1,
       crust = null,
       extras = [],
-      observation = ''
+      observation = '',
+      _allFlavors = null
     } = itemPayload;
 
+    // Determina preço base considerando tamanho (product_size_prices)
     let basePrice = Number(product.price);
+    if (size && product.id) {
+      const allPrices = this.productSizePrices || [];
+      const found = allPrices.find(p=> p.product_id===product.id && p.size_id===size.id);
+      if (found) basePrice = Number(found.price);
+    }
     let displayName = product.name;
 
-    if (secondFlavor && secondFlavor.name) {
-      basePrice = Math.max(Number(product.price), Number(secondFlavor.price));
-      displayName = `Pizza ½ ${product.name.replace('Pizza ', '')} + ½ ${secondFlavor.name.replace('Pizza ', '')}`;
+    // Suporte a 2-4 sabores: usa _allFlavors se fornecido, senão secondFlavor
+    const allFlavors = _allFlavors && _allFlavors.length ? _allFlavors : (secondFlavor ? [secondFlavor] : []);
+    if (allFlavors.length) {
+      const prices = [basePrice, ...allFlavors.map(f=>{
+        const allPrices = this.productSizePrices || [];
+        const fp = size ? allPrices.find(p=> p.product_id===f.id && p.size_id===size.id) : null;
+        return fp ? Number(fp.price) : Number(f.price);
+      })];
+      basePrice = Math.max(...prices);
+      const names = [product.name, ...allFlavors.map(f=> f.name)];
+      // Monta nome com frações
+      if (allFlavors.length===1) displayName = `Pizza ½ ${names[0].replace('Pizza ','')} + ½ ${names[1].replace('Pizza ','')}`;
+      else if (allFlavors.length===2) displayName = `Pizza 1/3 ${names.map(n=>n.replace('Pizza ','')).join(' + ')}`;
+      else if (allFlavors.length===3) displayName = `Pizza 1/4 ${names.map(n=>n.replace('Pizza ','')).join(' + ')}`;
+      else displayName = `Pizza ${names.map(n=>n.replace('Pizza ','')).join(' + ')}`;
     }
 
     let unitPrice = basePrice;
-    if (size && typeof size.price_diff === 'number') {
+    if (size && typeof size.price_diff === 'number' && (!this.pizzaSizes || !this.pizzaSizes.length)) {
       unitPrice += size.price_diff;
-      if (size.name) {
-        const sizeShort = size.name.split('(')[0].trim();
-        displayName += ` [${sizeShort}]`;
-      }
+    }
+    if (size && size.name) {
+      const sizeShort = size.name.split('(')[0].trim();
+      displayName += ` [${sizeShort}]`;
     }
 
     if (crust && crust.price) {

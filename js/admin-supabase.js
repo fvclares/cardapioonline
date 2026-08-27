@@ -4,8 +4,8 @@
  * Sistema de Convites (invite-only)
  */
 
-import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi } from './lib/supabase.js?v=14';
-import storage from './state/storage-supabase.js?v=14';
+import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi, pizzaSizesApi, productSizePricesApi } from './lib/supabase.js?v=15';
+import storage from './state/storage-supabase.js?v=15';
 
 // Expose para compatibilidade global
 window.supabase = supabase;
@@ -15,6 +15,8 @@ window.categoriesApi = categoriesApi;
 window.productsApi = productsApi;
 window.addonGroupsApi = addonGroupsApi;
 window.addonOptionsApi = addonOptionsApi;
+window.pizzaSizesApi = pizzaSizesApi;
+window.productSizePricesApi = productSizePricesApi;
 window.neighborhoodsApi = neighborhoodsApi;
 window.ordersApi = ordersApi;
 window.settingsApi = settingsApi;
@@ -733,10 +735,12 @@ async function openProductModal(prodId = null) {
   const descInput = document.getElementById('prodDescriptionInput');
   const imgInput = document.getElementById('prodImageInput');
   const imgCurrent = document.getElementById('prodImageCurrentUrl');
+  const isPizzaInput = document.getElementById('prodIsPizzaInput');
   const crustsInput = document.getElementById('prodHasCrustsInput');
   const extrasInput = document.getElementById('prodHasExtrasInput');
   const availInput = document.getElementById('prodAvailableInput');
   const previewContainer = document.getElementById('prodImagePreview');
+  const priceContainer = document.getElementById('prodSizePricesContainer');
   const modal = document.getElementById('productModalBackdrop');
 
   updateCategoryDropdowns();
@@ -755,9 +759,19 @@ async function openProductModal(prodId = null) {
       imgCurrent.value = prod.image_url || '';
       if (prod.image_url) showPreview('prodImagePreview', prod.image_url);
       else previewContainer.innerHTML = '';
+      isPizzaInput.checked = !!prod.is_pizza;
       crustsInput.checked = !!prod.has_crusts;
       extrasInput.checked = !!prod.has_extras;
       availInput.checked = prod.available !== false;
+      // mostra precos por tamanho se pizza
+      if (prod.is_pizza) {
+        priceContainer.style.display = 'block';
+        document.getElementById('prodPriceInput').parentElement.style.display='none';
+        await renderProdSizePrices(prodId);
+      } else {
+        priceContainer.style.display = 'none';
+        document.getElementById('prodPriceInput').parentElement.style.display='block';
+      }
     }
   } else {
     titleEl.textContent = 'Novo Produto';
@@ -770,10 +784,24 @@ async function openProductModal(prodId = null) {
     imgInput.value = '';
     imgCurrent.value = '';
     previewContainer.innerHTML = '';
+    isPizzaInput.checked = false;
     crustsInput.checked = true;
     extrasInput.checked = true;
     availInput.checked = true;
+    priceContainer.style.display = 'none';
+    document.getElementById('prodPriceInput').parentElement.style.display='block';
   }
+
+  isPizzaInput.onchange = () => {
+    if (isPizzaInput.checked) {
+      priceContainer.style.display = 'block';
+      document.getElementById('prodPriceInput').parentElement.style.display='none';
+      renderProdSizePrices(prodId);
+    } else {
+      priceContainer.style.display = 'none';
+      document.getElementById('prodPriceInput').parentElement.style.display='block';
+    }
+  };
 
   imgInput.onchange = (e) => {
     const file = e.target.files?.[0];
@@ -836,13 +864,17 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
     return;
   }
 
+  const isPizza = document.getElementById('prodIsPizzaInput').checked;
+  let basePriceVal = Number(document.getElementById('prodPriceInput').value) || 0;
+  // Se pizza e tem tamanhos, base_price será o menor preço por tamanho (fallback)
   const productData = {
     codigo: codigoVal,
     name: document.getElementById('prodNameInput').value.trim(),
     category_id: document.getElementById('prodCategorySelect').value,
-    base_price: Number(document.getElementById('prodPriceInput').value),
+    base_price: isPizza ? 0 : basePriceVal,
     description: document.getElementById('prodDescriptionInput').value.trim(),
     image_url: imageUrl,
+    is_pizza: isPizza,
     has_crusts: document.getElementById('prodHasCrustsInput').checked,
     has_extras: document.getElementById('prodHasExtrasInput').checked,
     available: document.getElementById('prodAvailableInput').checked
@@ -864,6 +896,26 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
     result = await trySave(withoutCodigo);
     error = result.error;
     usedFallback = !error;
+  }
+  // Salva preços por tamanho se pizza
+  if (!error && isPizza) {
+    const prodId = result.data?.id || id;
+    const inputs = document.querySelectorAll('#prodSizePricesFields input[data-size-id]');
+    let minPrice = null;
+    for (const inp of inputs) {
+      const sizeId = inp.dataset.sizeId;
+      const val = inp.value.trim();
+      if (val !== '' && !isNaN(val)) {
+        const price = Number(val);
+        await productSizePricesApi.upsert(prodId, sizeId, price);
+        if (minPrice === null || price < minPrice) minPrice = price;
+      } else {
+        await supabase.from('product_size_prices').delete().eq('product_id', prodId).eq('size_id', sizeId);
+      }
+    }
+    if (minPrice !== null) {
+      await productsApi.update(prodId, { base_price: minPrice });
+    }
   }
   showLoading(false);
 
@@ -1116,6 +1168,7 @@ const tabTitles = {
   'tab-categories': 'Gestão de Categorias',
   'tab-products': 'Catálogo de Produtos & Preços',
   'tab-orders': 'Pedidos Recebidos',
+  'tab-sizes': 'Tamanhos de Pizza',
   'tab-addons': 'Bordas & Extras',
   'tab-share': 'Link da Loja',
   'tab-invites': 'Gerenciar Convites',
@@ -1139,6 +1192,7 @@ navItems.forEach(item => {
     if (tabId === 'tab-categories') renderCategories();
     if (tabId === 'tab-products') renderProducts();
     if (tabId === 'tab-orders') renderOrders();
+    if (tabId === 'tab-sizes') renderPizzaSizes();
     if (tabId === 'tab-addons') renderAddons();
     if (tabId === 'tab-share') updatePublicUrl(currentStore?.slug);
     if (tabId === 'tab-invites') renderInvites();
@@ -1531,6 +1585,103 @@ document.getElementById('addonOptionForm').addEventListener('submit', async (e)=
 });
 
 
+
+// ============================================
+// TAMANHOS DE PIZZA
+// ============================================
+async function renderPizzaSizes() {
+  const container = document.getElementById('pizzaSizesListContainer');
+  if (!currentStoreId) { container.innerHTML='<p style="color:var(--text-muted);">Crie sua loja primeiro.</p>'; return; }
+  const { data, error } = await pizzaSizesApi.listAll(currentStoreId);
+  if (error) { container.innerHTML=`<p style="color:var(--status-closed);">${error.message}</p>`; return; }
+  if (!data?.length) {
+    container.innerHTML=`<div style="text-align:center; padding:2rem; border:1px dashed var(--border); border-radius:var(--radius-md); color:var(--text-muted);">Nenhum tamanho cadastrado. Crie P, M, G, Família etc.</div>`;
+    return;
+  }
+  container.innerHTML = data.map(s=>`
+    <div class="admin-card" style="padding:1rem; margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div style="font-weight:800;">${s.name} <span style="font-weight:400; font-size:0.75rem; color:var(--text-muted);">${s.slices} fatias • até ${s.max_flavors} sabor${s.max_flavors>1?'es':''} • ordem ${s.display_order} ${s.is_active?'':'• inativo'}</span></div>
+      </div>
+      <div style="display:flex; gap:0.4rem;">
+        <button class="btn btn-secondary btn-sm btn-edit-pizza-size" data-id="${s.id}">✏️</button>
+        <button class="btn btn-secondary btn-sm btn-del-pizza-size" data-id="${s.id}" style="color:var(--status-closed);">🗑️</button>
+      </div>
+    </div>
+  `).join('');
+  container.querySelectorAll('.btn-edit-pizza-size').forEach(b=> b.addEventListener('click', ()=> openPizzaSizeModal(b.dataset.id)));
+  container.querySelectorAll('.btn-del-pizza-size').forEach(b=> b.addEventListener('click', ()=> deletePizzaSize(b.dataset.id)));
+}
+function openPizzaSizeModal(id=null){
+  const modal=document.getElementById('pizzaSizeModalBackdrop');
+  const title=document.getElementById('pizzaSizeModalTitle');
+  document.getElementById('pizzaSizeEditId').value=id||'';
+  if(!id){
+    title.textContent='Novo Tamanho';
+    document.getElementById('pizzaSizeForm').reset();
+    document.getElementById('pizzaSizeOrderInput').value='1';
+    document.getElementById('pizzaSizeSlicesInput').value='8';
+    document.getElementById('pizzaSizeMaxFlavorsInput').value='1';
+    document.getElementById('pizzaSizeActiveInput').checked=true;
+  } else {
+    title.textContent='Editar Tamanho';
+    pizzaSizesApi.listAll(currentStoreId).then(({data})=>{
+      const s=data?.find(x=>x.id===id); if(!s) return;
+      document.getElementById('pizzaSizeNameInput').value=s.name;
+      document.getElementById('pizzaSizeSlicesInput').value=s.slices;
+      document.getElementById('pizzaSizeMaxFlavorsInput').value=String(s.max_flavors);
+      document.getElementById('pizzaSizeOrderInput').value=s.display_order;
+      document.getElementById('pizzaSizeActiveInput').checked=!!s.is_active;
+    });
+  }
+  modal.classList.add('active');
+}
+function closePizzaSizeModal(){ document.getElementById('pizzaSizeModalBackdrop').classList.remove('active'); }
+async function deletePizzaSize(id){
+  if(!confirm('Excluir este tamanho? Preços das pizzas neste tamanho serão apagados.')) return;
+  showLoading(true);
+  const {error}=await pizzaSizesApi.delete(id);
+  showLoading(false);
+  if(error) showToast(error.message,'error'); else { showToast('🗑️ Tamanho removido','success'); renderPizzaSizes(); }
+}
+document.getElementById('btnNewPizzaSize')?.addEventListener('click', ()=> openPizzaSizeModal());
+document.getElementById('btnClosePizzaSizeModal')?.addEventListener('click', closePizzaSizeModal);
+document.getElementById('btnCancelPizzaSize')?.addEventListener('click', closePizzaSizeModal);
+document.getElementById('pizzaSizeForm')?.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const id=document.getElementById('pizzaSizeEditId').value;
+  const payload={
+    name: document.getElementById('pizzaSizeNameInput').value.trim(),
+    slices: Number(document.getElementById('pizzaSizeSlicesInput').value)||8,
+    max_flavors: Number(document.getElementById('pizzaSizeMaxFlavorsInput').value)||1,
+    display_order: Number(document.getElementById('pizzaSizeOrderInput').value)||1,
+    is_active: document.getElementById('pizzaSizeActiveInput').checked
+  };
+  showLoading(true);
+  let error;
+  if(id){ const r=await pizzaSizesApi.update(id,payload); error=r.error; }
+  else { const r=await pizzaSizesApi.create(currentStoreId,payload); error=r.error; }
+  showLoading(false);
+  if(error) showToast(error.message,'error'); else { closePizzaSizeModal(); showToast('✅ Tamanho salvo!','success'); renderPizzaSizes(); }
+});
+
+// Produto: preços por tamanho
+async function renderProdSizePrices(productId){
+  const container=document.getElementById('prodSizePricesFields');
+  const { data: sizes } = await pizzaSizesApi.listAll(currentStoreId);
+  if(!sizes?.length){ container.innerHTML='<p style="font-size:0.8rem; color:var(--text-muted);">Cadastre tamanhos em Tamanhos Pizza primeiro.</p>'; return; }
+  let pricesMap={};
+  if(productId){
+    const { data: prices } = await productSizePricesApi.listByProduct(productId);
+    (prices||[]).forEach(p=> pricesMap[p.size_id]=p.price);
+  }
+  container.innerHTML = sizes.map(s=>`
+    <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
+      <span style="flex:1; font-size:0.85rem; font-weight:600;">${s.name} <span style="color:var(--text-muted); font-weight:400;">(${s.slices}f • ${s.max_flavors} sab)</span></span>
+      <input type="number" step="0.50" data-size-id="${s.id}" placeholder="—" value="${pricesMap[s.id]!==undefined ? pricesMap[s.id] : ''}" style="width:110px; text-align:right;" />
+    </div>
+  `).join('');
+}
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
