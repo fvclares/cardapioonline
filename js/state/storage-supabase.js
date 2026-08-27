@@ -63,7 +63,12 @@ class SupabaseStorageEngine {
       if (productsResult.error) throw productsResult.error;
       if (addonsResult.error) throw addonsResult.error;
 
-      this._dataCache.store = storeResult.data;
+      const rawStore = storeResult.data;
+      if (rawStore) {
+        rawStore.logo = rawStore.logo_url || rawStore.logo;
+        rawStore.cover = rawStore.cover_url || rawStore.cover;
+      }
+      this._dataCache.store = rawStore;
       this._dataCache.categories = (categoriesResult.data || []).map(normalizeCategory);
       this._dataCache.products = (productsResult.data || []).map(normalizeProduct);
 
@@ -160,6 +165,7 @@ class SupabaseStorageEngine {
     }
     const { data, error } = await storeApi.update(this.storeId, storeData);
     if (error) throw error;
+    if (data) { data.logo = data.logo_url || data.logo; data.cover = data.cover_url || data.cover; }
     this._dataCache.store = data;
     this.emitChange('store_updated', data);
     return data;

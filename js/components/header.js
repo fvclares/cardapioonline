@@ -27,14 +27,16 @@ function renderHeader(container) {
     `;
   }
 
+  const coverUrl = store.cover || store.cover_url || '';
+  const logoUrl = store.logo || store.logo_url || '';
   container.innerHTML = `
     <header class="store-header">
-      <div class="store-cover" style="background-image: linear-gradient(180deg, rgba(14, 17, 23, 0.2) 0%, rgba(14, 17, 23, 0.85) 100%), url('${store.cover || ''}')"></div>
+      <div class="store-cover" style="background-image: linear-gradient(180deg, rgba(14, 17, 23, 0.2) 0%, rgba(14, 17, 23, 0.85) 100%), url('${coverUrl}')"></div>
       
       <div class="container">
         <div class="store-info-wrapper">
           <div class="store-main-meta">
-            <img src="${store.logo || ''}" alt="${store.name}" class="store-logo" />
+            ${logoUrl ? `<img src="${logoUrl}" alt="${store.name}" class="store-logo" />` : ''}
             <div class="store-titles">
               <h1 class="store-name">${store.name}</h1>
               <div class="store-details-bar" style="margin-top: 0.35rem;">
