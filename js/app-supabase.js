@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (ogDesc) ogDesc.content = store.description || 'Faça seu pedido online!';
     if (footerStoreName) footerStoreName.textContent = store.name;
 
-    // 5. Verifica se loja está aberta (considera horário por dia)
+    // 5. Verifica se loja está aberta (considera horário por dia) — não trava a página, apenas informa status no header
     const _settings = storage.getSettings ? storage.getSettings() : {};
     const _schedule = _settings?.schedule;
     const _isOpen = (()=>{
@@ -64,11 +64,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       if(close<open) return cur>=open || cur<=close;
       return cur>=open && cur<=close;
     })();
-    if (!_isOpen) {
-      loadingScreen.classList.add('hidden');
-      showStoreClosed(store);
-      return;
-    }
+    window._storeIsOpen = _isOpen;
+    if (!_isOpen) console.info('Loja fechada — página mantida com badge "Fechado" no header (app-supabase.js:53). Cliente ainda pode navegar e montar sacola para agendamento.');
 
     // 6. Renderiza header
     if (window.renderHeader) {
