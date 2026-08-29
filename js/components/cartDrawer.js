@@ -56,6 +56,8 @@ function setupCartDrawer(onProceedToCheckout) {
     const minOrder = Number(store.min_order_value || 0);
 
     const isBelowMin = subtotal < minOrder;
+    const fractionalCheck = window.appState.validateFractionalCart ? window.appState.validateFractionalCart() : { valid:true, errors:[] };
+    const hasFractionalError = !fractionalCheck.valid;
 
     if (items.length === 0) {
       cartDrawerContent.innerHTML = `
@@ -93,12 +95,21 @@ function setupCartDrawer(onProceedToCheckout) {
           </button>
         </div>
 
+        ${hasFractionalError ? `
+          <div style="background: rgba(255, 184, 0, 0.12); border: 1px solid rgba(255, 184, 0, 0.35); color: #fde68a; padding: 0.75rem; border-radius: var(--radius-md); font-size: 0.82rem; margin-bottom: 1rem;">
+            <div style="font-weight:700; margin-bottom:0.3rem;">⚠️ Pizza incompleta</div>
+            ${fractionalCheck.errors.map(e=>`<div style="margin-bottom:0.25rem;">• ${e}</div>`).join('')}
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.35rem;">Adicione outra ½ do mesmo tamanho ou remova a fração.</div>
+          </div>
+        ` : ''}
+
         <!-- Lista de Itens da Sacola -->
         <div class="cart-items-list">
           ${items.map(item => `
-            <div class="cart-item">
+            <div class="cart-item" style="${item.fractionValue && item.fractionValue<1 ? 'border-left:3px solid #fbbf24;' : ''}">
               <div class="cart-item-details">
-                <div class="cart-item-title">${item.productName}</div>
+                <div class="cart-item-title">${item.productName} ${item.fractionValue && item.fractionValue<1 ? `<span style="background:#fbbf24; color:#78350f; font-size:0.65rem; font-weight:800; padding:0.15rem 0.4rem; border-radius:999px; margin-left:0.3rem; vertical-align:middle;">${item.fractionLabel|| (item.fractionValue===0.5?'½':'1/'+Math.round(1/item.fractionValue))} ${item.size? item.size.name.split('(')[0].trim():''}</span>` : ''}</div>
+                ${item.fractionValue && item.fractionValue<1 ? `<div style="font-size:0.72rem; color:#fbbf24; font-weight:600; margin-top:0.15rem;">🍕 ${item.fractionLabel} pizza — complete com outra ${item.fractionLabel} do mesmo tamanho</div>` : ''}
                 
                 ${item.crust && item.crust.name && item.crust.price > 0 ? `
                   <div class="cart-item-addons">🧀 Borda: ${item.crust.name} (+${cs ? cs.formatCurrency(item.crust.price) : 'R$ ' + item.crust.price})</div>
@@ -193,10 +204,15 @@ function setupCartDrawer(onProceedToCheckout) {
             ⚠️ Pedido mínimo: ${cs ? cs.formatCurrency(minOrder) : 'R$ ' + minOrder}. Faltam ${cs ? cs.formatCurrency(minOrder - subtotal) : 'R$ ' + (minOrder - subtotal)}.
           </div>
         ` : ''}
+        ${hasFractionalError ? `
+          <div style="background: rgba(239, 68, 68, 0.12); border:1px solid rgba(239,68,68,0.35); color:#fca5a5; padding:0.6rem; border-radius:var(--radius-sm); font-size:0.80rem; margin-bottom:1rem; text-align:center; font-weight:600;">
+            ❌ Complete suas pizzas fracionadas antes de finalizar (mesmo tamanho, pizza inteira).
+          </div>
+        ` : ''}
       </div>
 
       <div class="modal-footer">
-        <button class="btn btn-whatsapp btn-block" id="btnProceedCheckout" ${isBelowMin ? 'disabled style="opacity: 0.5; pointer-events: none;"' : ''}>
+        <button class="btn btn-whatsapp btn-block" id="btnProceedCheckout" ${(isBelowMin || hasFractionalError) ? 'disabled style="opacity: 0.5; pointer-events: none;"' : ''}>
           <span>Finalizar Pedido</span>
           <span>${cs ? cs.formatCurrency(total) : 'R$ ' + total} →</span>
         </button>

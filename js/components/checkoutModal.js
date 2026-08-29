@@ -191,6 +191,16 @@ function setupCheckoutModal() {
 
   function handleOrderSubmission(profile, savedAddresses) {
     const cs = window.customerService;
+    // Validação fração ½ - pizzas incompletas
+    if(window.appState.validateFractionalCart){
+      const v = window.appState.validateFractionalCart();
+      if(!v.valid){
+        alert('⚠️ Pizza incompleta:\n\n' + v.errors.join('\n') + '\n\nComplete com outra ½ do mesmo tamanho ou remova a fração.');
+        return;
+      }
+      // Validação tamanho consistente: verifica se alguma pizza fracionada tem tamanho diferente dentro do mesmo "grupo" - já agrupado por tamanho, mas se misturar tamanhos diferentes em meias, já está separado por tamanho, então erro já é por tamanho incompleto.
+      // Também bloqueia 3/4, 1 inteira + ½ (que já cai no erro anterior)
+    }
     const nameInput = checkoutContent.querySelector('#custNameInput');
     const phoneInput = checkoutContent.querySelector('#custPhoneInput');
     const notesInput = checkoutContent.querySelector('#orderGeneralNotes');
