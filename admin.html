@@ -253,6 +253,15 @@
               </div>
             </div>
 
+            <div style="margin-bottom:1.5rem; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius-md); padding:1rem;">
+              <label class="form-label" style="margin-bottom:0.5rem; display:block;">🍕 Modelo de precificação para pizzas fracionadas (½, ¼)</label>
+              <select id="fractionPricingModeInput" style="width:100%; max-width:520px;">
+                <option value="max">💎 Valor da maior pizza (padrão — cobra pelo sabor mais caro da pizza completa)</option>
+                <option value="proportional">⚖️ Proporcional (soma proporcional de cada metade — ½ + ½ = metade de cada preço)</option>
+              </select>
+              <span class="form-help">Ex: ½ Mista R$68 + ½ Calabresa R$78 → <strong>Maior</strong> = R$78,00 | <strong>Proporcional</strong> = R$34,00 + R$39,00 = R$73,00. Validação exige pizzas completas do mesmo tamanho.</span>
+            </div>
+
             <div class="form-grid form-grid-2" style="margin-bottom: 1.5rem;">
               <div class="form-group">
                 <label class="form-label">Logo da Loja</label>

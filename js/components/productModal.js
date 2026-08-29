@@ -318,6 +318,15 @@ function setupProductModal() {
       selectedCrust = crustGroup.options.find(o => o.price === 0) || null;
     }
 
+    function getCurrentPricingMode(){
+      try{
+        if(window.appState?.getFractionPricingMode) return window.appState.getFractionPricingMode();
+        const s = window.storage?.getSettings?.() || {};
+        let m = s.fraction_pricing_mode || s.fractionPricingMode || window.appState?.settings?.fraction_pricing_mode || window.appState?.store?.settings?.fraction_pricing_mode || 'max';
+        if(m==='proporcional') m='proportional';
+        return m==='proportional' ? 'proportional' : 'max';
+      }catch{ return 'max'; }
+    }
     function updateFractionUI(){
       const grp = modalContent.querySelector('#flavorsGroup');
       const help = modalContent.querySelector('#fractionHelp');
@@ -330,8 +339,12 @@ function setupProductModal() {
         if(isFraction){
           const sizeLabel = selectedSize ? selectedSize.name.split('(')[0].trim() : '';
           const price = getPriceForProductSize(product, selectedSize);
+          const mode = getCurrentPricingMode();
+          const modeDesc = mode==='proportional'
+            ? 'Modelo da loja: <strong>Proporcional</strong> — cada ½ vale metade do preço (ex: ½ R$68 + ½ R$78 = R$73)'
+            : 'Modelo da loja: <strong>Maior pizza</strong> — pizza completa vale o sabor mais caro (ex: ½ R$68 + ½ R$78 = R$78)';
           help.style.display='block';
-          help.innerHTML = `Você vai adicionar <strong>${selectedFraction.label} ${product.name.replace('Pizza ','')}</strong> ${sizeLabel?`[${sizeLabel}]`:''} por <strong>${cs?cs.formatCurrency(price):'R$ '+price}</strong>.<br> No carrinho ficará como <strong>${selectedFraction.label}</strong> — complete com outra <strong>${selectedFraction.label}</strong> do mesmo tamanho. Validação ao fechar pedido garante pizzas completas.`;
+          help.innerHTML = `Você vai adicionar <strong>${selectedFraction.label} ${product.name.replace('Pizza ','')}</strong> ${sizeLabel?`[${sizeLabel}]`:''} por <strong>${cs?cs.formatCurrency(price):'R$ '+price}</strong> (pizza inteira).<br> No carrinho ficará como <strong>${selectedFraction.label}</strong> — complete com outra <strong>${selectedFraction.label}</strong> do mesmo tamanho. Validação ao fechar garante pizzas completas.<br><span style="font-size:0.72rem; color:var(--text-muted);">${modeDesc} — configurável no painel em Configurações.</span>`;
           help.style.borderColor='rgba(37,211,102,0.35)';
           help.style.background='rgba(37,211,102,0.08)';
           help.style.color='var(--text-primary)';
@@ -536,25 +549,20 @@ function setupProductModal() {
 
     function updateModalTotal() {
       const unit = calculateUnitPrice();
-      // Para fração, mostra preço da pizza completa como referência, e total proporcional
       let total;
-      let label='';
       if(selectedFraction && selectedFraction.value < 1){
+        const mode = getCurrentPricingMode();
         const effectiveQty = quantity * selectedFraction.value;
-        // ex: 1 meia = 0.5 pizza, 2 meias =1 pizza
-        total = unit * Math.ceil(effectiveQty); // arredonda para cima para estimativa de pizzas completas
-        label = ` (${quantity}× ${selectedFraction.label} ≈ ${effectiveQty.toFixed(2).replace('.',',')} pizza)`;
-        // mostra também proporcional para transparência
-        // atualiza help
-        const help = modalContent.querySelector('#fractionHelp');
-        if(help && selectedFraction.value<1){
-          help.innerHTML = `Você vai adicionar <strong>${selectedFraction.label} ${product.name.replace('Pizza ','')}</strong> ${selectedSize?`[${selectedSize.name.split('(')[0].trim()}]`:''} — <strong>${cs?cs.formatCurrency(unit):'R$ '+unit}</strong> é o valor da pizza inteira (maior sabor). No carrinho ficará como <strong>${selectedFraction.label}</strong> — complete com outra <strong>${selectedFraction.label}</strong> do mesmo tamanho. ${label}`;
+        if(mode === 'proportional'){
+          total = unit * effectiveQty;
+        } else {
+          total = unit * Math.ceil(effectiveQty);
         }
+        // help já é atualizado em updateFractionUI, apenas garante total
       } else {
         total = unit * quantity;
       }
       priceDisplay.textContent = cs ? cs.formatCurrency(total) : 'R$ ' + total;
-      // também atualiza tooltip do botão
       const btnAdd = modalContent.querySelector('#btnConfirmAddToCart');
       if(btnAdd && selectedFraction && selectedFraction.value<1){
         btnAdd.title = `Adicionará ${quantity} × ${selectedFraction.label} (total ${ (quantity*selectedFraction.value).toFixed(2)} pizza)`;

@@ -484,6 +484,14 @@ async function loadStoreData() {
   statusText.textContent = isOpen ? 'Aberto' : 'Fechado';
   statusText.style.color = isOpen ? 'var(--status-open)' : 'var(--status-closed)';
 
+  // Modelo de precificação fracionada
+  const pricingEl = document.getElementById('fractionPricingModeInput');
+  if(pricingEl){
+    let mode = settings?.fraction_pricing_mode || 'max';
+    if(mode==='proporcional') mode='proportional';
+    pricingEl.value = (mode==='proportional' ? 'proportional' : 'max');
+  }
+
   // Live preview file (once)
   const logoInput = document.getElementById('storeLogoInput');
   const coverInput = document.getElementById('storeCoverInput');
@@ -587,10 +595,24 @@ document.getElementById('storeSettingsForm').addEventListener('submit', async (e
     status: computedStatus
   };
 
+  const fractionPricingMode = document.getElementById('fractionPricingModeInput')?.value || 'max';
   showLoading(true);
   const { data, error } = await storeApi.update(currentStore.id, updates);
-  if (!error) await settingsApi.upsert(currentStoreId, { schedule });
+  let settingsError = null;
+  if (!error) {
+    const { error: sErr } = await settingsApi.upsert(currentStoreId, { schedule, fraction_pricing_mode: fractionPricingMode });
+    settingsError = sErr;
+    if(sErr && sErr.message && sErr.message.includes('fraction_pricing_mode')){
+      console.warn('Coluna fraction_pricing_mode ainda não existe, salvando apenas schedule', sErr.message);
+      const { error: sErr2 } = await settingsApi.upsert(currentStoreId, { schedule });
+      settingsError = sErr2;
+      if(!sErr2) showToast('⚠️ Salvo sem modelo de precificação — rode fix-fraction-pricing.sql no Supabase', 'info');
+    }
+  }
   showLoading(false);
+  if(settingsError){
+    showToast('Aviso configurações: ' + settingsError.message, 'error');
+  }
 
   if (error) {
     showToast('Erro ao salvar: ' + error.message, 'error');

@@ -11,6 +11,7 @@ class StoreState {
     this.addonGroups = {};
     this.pizzaSizes = [];
     this.productSizePrices = [];
+    this.settings = {};
     this.customer = null;
     this.listeners = [];
     this._refreshing = false;
@@ -90,6 +91,18 @@ class StoreState {
     }
   }
 
+  getFractionPricingMode(){
+    // Le de store_settings.fraction_pricing_mode, fallback stores.settings json ou 'max'
+    const s = this.settings || (window.storage?.getSettings?.() || {});
+    let mode = s.fraction_pricing_mode || s.fractionPricingMode || s.settings?.fraction_pricing_mode;
+    // fallback para stores.settings jsonb
+    if(!mode && this.store?.settings?.fraction_pricing_mode) mode = this.store.settings.fraction_pricing_mode;
+    if(!mode && this.store?.settings?.fractionPricingMode) mode = this.store.settings.fractionPricingMode;
+    if(mode === 'proporcional') mode = 'proportional';
+    if(mode === 'proportional' || mode === 'proporcional') return 'proportional';
+    return 'max'; // default: maior pizza
+  }
+
   // Refresh assíncrono (busca do Supabase)
   async refreshData() {
     if (this._refreshing) return;
@@ -104,13 +117,14 @@ class StoreState {
     try {
       // Se for Supabase, busca dados
       if (!storageEngine.useLocalFallback && storageEngine.storeId) {
-        const [store, categories, products, addonGroups, pizzaSizes, sizePrices] = await Promise.all([
+        const [store, categories, products, addonGroups, pizzaSizes, sizePrices, settings] = await Promise.all([
           storageEngine.getStore(),
           storageEngine.getCategories(),
           storageEngine.getProducts(),
           storageEngine.getAddonGroups(),
           storageEngine.getPizzaSizes ? storageEngine.getPizzaSizes() : [],
-          storageEngine.getProductSizePrices ? storageEngine.getProductSizePrices() : []
+          storageEngine.getProductSizePrices ? storageEngine.getProductSizePrices() : [],
+          storageEngine.getSettings ? storageEngine.getSettings() : {}
         ]);
         this.store = store || this.store;
         this.categories = categories || this.categories;
@@ -118,6 +132,7 @@ class StoreState {
         this.addonGroups = addonGroups || this.addonGroups;
         this.pizzaSizes = pizzaSizes || this.pizzaSizes;
         this.productSizePrices = sizePrices || this.productSizePrices;
+        this.settings = settings || this.settings;
       } else {
         // Fallback local
         this.store = storageEngine.getStore();
@@ -126,6 +141,7 @@ class StoreState {
         this.addonGroups = storageEngine.getAddonGroups();
         this.pizzaSizes = [];
         this.productSizePrices = [];
+        this.settings = storageEngine.getSettings ? storageEngine.getSettings() : {};
       }
       this.customer = storageEngine.getCustomerProfile();
       
@@ -150,13 +166,14 @@ class StoreState {
     if (!storageEngine) return;
     
     try {
-      const [store, categories, products, addonGroups, pizzaSizes, sizePrices] = await Promise.all([
+      const [store, categories, products, addonGroups, pizzaSizes, sizePrices, settings] = await Promise.all([
         storageEngine.getStore(),
         storageEngine.getCategories(),
         storageEngine.getProducts(),
         storageEngine.getAddonGroups(),
         storageEngine.getPizzaSizes ? storageEngine.getPizzaSizes() : [],
-        storageEngine.getProductSizePrices ? storageEngine.getProductSizePrices() : []
+        storageEngine.getProductSizePrices ? storageEngine.getProductSizePrices() : [],
+        storageEngine.getSettings ? storageEngine.getSettings() : {}
       ]);
       this.store = store || this.store;
       this.categories = categories || this.categories;
@@ -164,6 +181,7 @@ class StoreState {
       this.addonGroups = addonGroups || this.addonGroups;
       this.pizzaSizes = pizzaSizes || this.pizzaSizes;
       this.productSizePrices = sizePrices || this.productSizePrices;
+      this.settings = settings || this.settings;
     } catch (err) {
       console.warn('_refreshFromStorage failed:', err);
     }
@@ -244,14 +262,27 @@ class StoreState {
     return { valid: errors.length===0, errors, groups };
   }
   _computeFractionalSubtotal(){
-    // Calcula subtotal considerando frações: cada pizza completa (1.0) custa o max entre seus pedaços
+    const mode = this.getFractionPricingMode(); // 'max' ou 'proportional'
+    // Proporcional: soma simples proporcional (cada metade vale metade do preço)
+    if(mode === 'proportional'){
+      let total=0;
+      for(const item of this.cart.items){
+        const fv = (item.fractionValue!=null) ? Number(item.fractionValue) : 1;
+        const qty = Number(item.quantity||1);
+        const base = Number(item.basePrice!=null ? item.basePrice : item.unitPrice);
+        const effectivePrice = base + (item.crust?Number(item.crust.price||0):0) + (item.extras?item.extras.reduce((s,e)=>s+Number(e.price||0),0):0);
+        if(fv===1) total += effectivePrice * qty;
+        else total += effectivePrice * fv * qty;
+      }
+      return total;
+    }
+    // Max: cada pizza completa (1.0) custa o max entre seus pedaços
     const fractionalBySize={};
     let wholeSubtotal=0;
     for(const item of this.cart.items){
       const fv = (item.fractionValue!=null) ? Number(item.fractionValue) : 1;
       const qty = Number(item.quantity||1);
       const base = Number(item.basePrice!=null ? item.basePrice : item.unitPrice);
-      // custo de borda/extra já incluso em unitPrice? Para fracionadas, extras são por pedaço, mas vamos incluir como parte do base para max
       const effectivePrice = base + (item.crust?Number(item.crust.price||0):0) + (item.extras?item.extras.reduce((s,e)=>s+Number(e.price||0),0):0);
       if(fv===1){
         wholeSubtotal += effectivePrice * qty;
@@ -264,48 +295,38 @@ class StoreState {
     let fracSubtotal=0;
     for(const key in fractionalBySize){
       const list = fractionalBySize[key].slice().sort((a,b)=> b.price - a.price);
-      // Empacota frações em pizzas de 1.0
       let idx=0;
       while(idx < list.length){
         let sum=0;
         let maxPrice=0;
-        let pieces=[];
         while(idx < list.length && sum < 0.999){
           const need = 1 - sum;
-          // tenta pegar próximo que caiba sem estourar muito (tolerância)
-          // como valores são 0.5,0.25,0.333, pegamos sequencialmente
           const entry = list[idx];
           const fv = (entry.item.fractionValue!=null) ? Number(entry.item.fractionValue) : 1;
           if(fv <= need + 0.001){
             sum += fv;
             if(entry.price > maxPrice) maxPrice = entry.price;
-            pieces.push(entry);
             idx++;
           } else {
-            // se não cabe, tenta próximo menor que caiba (para misturas 0.5+0.25+0.25)
             let found=false;
             for(let j=idx+1;j<list.length;j++){
               const e2=list[j];
               const fv2=(e2.item.fractionValue!=null)?Number(e2.item.fractionValue):1;
               if(fv2 <= need + 0.001){
-                // swap
                 sum+=fv2;
                 if(e2.price>maxPrice) maxPrice=e2.price;
-                pieces.push(e2);
                 list.splice(j,1);
                 found=true;
                 break;
               }
             }
-            if(!found) break; // não achou que caiba, fecha pizza incompleta (será erro de validação)
+            if(!found) break;
           }
         }
         if(Math.abs(sum-1) < 0.01){
           fracSubtotal += maxPrice;
         } else if(sum>0.001){
-          // pizza incompleta: cobra proporcional? Não, deixa como max mas validação vai barrar checkout
-          // Para exibição de subtotal, cobra max parcial (evita subtotal zero)
-          fracSubtotal += maxPrice * sum; // proporcional para não assustar
+          fracSubtotal += maxPrice * sum;
         }
       }
     }
@@ -448,7 +469,11 @@ class StoreState {
     if (item.quantity <= 0) {
       this.cart.items.splice(itemIndex, 1);
     } else {
-      item.itemTotal = item.unitPrice * item.quantity;
+      const fv = (item.fractionValue!=null) ? Number(item.fractionValue) : 1;
+      // Para fracionada, itemTotal é proporcional para exibição; subtotal real é recalculado via _computeFractionalSubtotal
+      // Mantém proporcional para listagem, mas getSubtotal corrige via modo
+      if(fv<1) item.itemTotal = item.unitPrice * item.quantity * fv;
+      else item.itemTotal = item.unitPrice * item.quantity;
     }
 
     this.notify();
