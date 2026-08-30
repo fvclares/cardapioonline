@@ -142,6 +142,17 @@ input::placeholder, textarea::placeholder {
   color: var(--text-muted);
 }
 
+/* Remove setinhas (spinners) dos inputs numéricos - preço em R$ usa máscara 0,00 */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 /* Utility Classes */
 .container {
   width: 100%;

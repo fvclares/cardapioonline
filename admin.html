@@ -245,11 +245,11 @@
             <div class="form-grid form-grid-2" style="margin-bottom: 1.25rem;">
               <div class="form-group">
                 <label class="form-label">Taxa Entrega Padrão (R$)</label>
-                <input type="number" step="0.50" id="storeDeliveryFeeInput" />
+                <input type="text" inputmode="decimal" placeholder="0,00" id="storeDeliveryFeeInput" />
               </div>
               <div class="form-group">
                 <label class="form-label">Pedido Mínimo (R$)</label>
-                <input type="number" step="1.00" id="storeMinOrderInput" />
+                <input type="text" inputmode="decimal" placeholder="0,00" id="storeMinOrderInput" />
               </div>
             </div>
 
@@ -553,7 +553,7 @@
             </div>
             <div class="form-group">
               <label class="form-label">Preço Base (R$) *</label>
-              <input type="number" step="0.50" id="prodPriceInput" placeholder="48.00" required />
+              <input type="text" inputmode="decimal" placeholder="0,00" id="prodPriceInput" required />
             </div>
           </div>
 
@@ -720,7 +720,7 @@
           <div class="form-grid form-grid-2" style="margin-bottom: 1rem;">
             <div class="form-group">
               <label class="form-label">Diferença de preço (R$) *</label>
-              <input type="number" step="0.50" id="addonOptionPriceInput" value="0" required />
+              <input type="text" inputmode="decimal" placeholder="0,00" id="addonOptionPriceInput" value="0,00" required />
               <span class="form-help">positivo = adicional, negativo = desconto</span>
             </div>
             <div class="form-group">

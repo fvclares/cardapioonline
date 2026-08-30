@@ -58,6 +58,43 @@ function showToast(message, type = 'info') {
 function formatCurrency(value) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
 }
+function formatCurrencyInput(value){
+  return Number(value||0).toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 });
+}
+function parseCurrency(str){
+  if(str==null || str==='') return 0;
+  const s=String(str).trim();
+  const isNeg=s.startsWith('-');
+  const digits=s.replace(/\D/g,'');
+  if(!digits) return 0;
+  const num=Number(digits)/100;
+  return isNeg ? -num : num;
+}
+function attachCurrencyMask(input, allowNegative=false){
+  if(!input || input._currencyMask) return;
+  input._currencyMask=true;
+  input.addEventListener('input', ()=>{
+    const raw=input.value;
+    const isNeg=allowNegative && raw.trim().startsWith('-');
+    let digits=raw.replace(/\D/g,'');
+    if(!digits) digits='0';
+    // evita overflow de 8 dígitos (99.999,99)
+    if(digits.length>10) digits=digits.slice(0,10);
+    let num=Number(digits)/100;
+    let formatted=num.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+    if(isNeg) formatted='-'+formatted;
+    input.value=formatted;
+  });
+  // inicializa com 0,00 se vazio
+  if(!input.value || input.value.trim()===''){
+    input.value='0,00';
+  } else {
+    // formata valor existente (pode vir como "48.5" do banco)
+    const parsed=Number(String(input.value).replace(',', '.'))||parseCurrency(input.value);
+    input.value=formatCurrencyInput(parsed);
+    if(allowNegative && String(input.value).startsWith('--')) input.value=input.value.replace('--','-');
+  }
+}
 
 function formatPhone(phone) {
   const cleaned = phone.replace(/\D/g, '');
@@ -461,8 +498,8 @@ async function loadStoreData() {
   document.getElementById('storePhoneInput').value = store.phone || '';
   document.getElementById('storePhoneDisplayInput').value = store.phone_display || '';
   document.getElementById('storeAddressInput').value = store.address || '';
-  document.getElementById('storeDeliveryFeeInput').value = store.default_delivery_fee || 7.00;
-  document.getElementById('storeMinOrderInput').value = store.min_order_value || 35.00;
+  document.getElementById('storeDeliveryFeeInput').value = formatCurrencyInput(store.default_delivery_fee ?? 7.00);
+  document.getElementById('storeMinOrderInput').value = formatCurrencyInput(store.min_order_value ?? 35.00);
   document.getElementById('storeLogoCurrentUrl').value = store.logo_url || '';
   document.getElementById('storeCoverCurrentUrl').value = store.cover_url || '';
   document.getElementById('storeLogoInput').value = '';
@@ -588,8 +625,8 @@ document.getElementById('storeSettingsForm').addEventListener('submit', async (e
     phone_display: document.getElementById('storePhoneDisplayInput').value.trim(),
     address: document.getElementById('storeAddressInput').value.trim(),
     opening_hours: openingHoursText,
-    default_delivery_fee: Number(document.getElementById('storeDeliveryFeeInput').value) || 7.00,
-    min_order_value: Number(document.getElementById('storeMinOrderInput').value) || 35.00,
+    default_delivery_fee: parseCurrency(document.getElementById('storeDeliveryFeeInput').value) || 0,
+    min_order_value: parseCurrency(document.getElementById('storeMinOrderInput').value) || 0,
     logo_url: logoUrl,
     cover_url: coverUrl,
     status: computedStatus
@@ -863,6 +900,7 @@ async function openProductModal(prodId = null) {
     if (featuredGroup) featuredGroup.style.display = featuredInput.checked ? 'flex' : 'none';
   }
   featuredInput.onchange = syncFeaturedUI;
+  attachCurrencyMask(priceInput);
 
   updateCategoryDropdowns();
 
@@ -874,7 +912,7 @@ async function openProductModal(prodId = null) {
       codigoInput.value = prod.codigo || await getNextCodigo();
       nameInput.value = prod.name;
       catSelect.value = prod.category_id;
-      priceInput.value = prod.base_price;
+      priceInput.value = formatCurrencyInput(prod.base_price ?? 0);
       descInput.value = prod.description || '';
       imgInput.value = '';
       imgCurrent.value = prod.image_url || '';
@@ -909,7 +947,7 @@ async function openProductModal(prodId = null) {
     const next = await getNextCodigo();
     codigoInput.value = next;
     nameInput.value = '';
-    priceInput.value = '';
+    priceInput.value = formatCurrencyInput(0);
     descInput.value = '';
     imgInput.value = '';
     imgCurrent.value = '';
@@ -998,7 +1036,7 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
   }
 
   const isPizza = document.getElementById('prodIsPizzaInput').checked;
-  let basePriceVal = Number(document.getElementById('prodPriceInput').value) || 0;
+  let basePriceVal = parseCurrency(document.getElementById('prodPriceInput').value) || 0;
   // Valida limite carrossel (5 itens)
   const wantFeatured = document.getElementById('prodIsFeaturedInput').checked;
   if (wantFeatured) {
@@ -1063,10 +1101,14 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
     for (const inp of inputs) {
       const sizeId = inp.dataset.sizeId;
       const val = inp.value.trim();
-      if (val !== '' && !isNaN(val)) {
-        const price = Number(val);
-        await productSizePricesApi.upsert(prodId, sizeId, price);
-        if (minPrice === null || price < minPrice) minPrice = price;
+      if (val !== '' && val !== '0,00') {
+        const price = parseCurrency(val);
+        if (!isNaN(price) && price>0) {
+          await productSizePricesApi.upsert(prodId, sizeId, price);
+          if (minPrice === null || price < minPrice) minPrice = price;
+        } else {
+          await supabase.from('product_size_prices').delete().eq('product_id', prodId).eq('size_id', sizeId);
+        }
       } else {
         await supabase.from('product_size_prices').delete().eq('product_id', prodId).eq('size_id', sizeId);
       }
@@ -1673,7 +1715,7 @@ async function openAddonOptionModal(groupId, optionId=null){
     title.textContent='Nova Opção';
     document.getElementById('addonOptionForm').reset();
     document.getElementById('addonOptionOrderInput').value='1';
-    document.getElementById('addonOptionPriceInput').value='0';
+    document.getElementById('addonOptionPriceInput').value=formatCurrencyInput(0);
   } else {
     title.textContent='Editar Opção';
     const {data:groups}=await addonGroupsApi.list(currentStoreId);
@@ -1681,7 +1723,7 @@ async function openAddonOptionModal(groupId, optionId=null){
     const o=g?.addon_options?.find(x=>x.id===optionId);
     if(!o) return;
     document.getElementById('addonOptionNameInput').value=o.name||'';
-    document.getElementById('addonOptionPriceInput').value=o.price_diff ?? 0;
+    document.getElementById('addonOptionPriceInput').value=formatCurrencyInput(o.price_diff ?? 0);
     document.getElementById('addonOptionOrderInput').value=o.display_order||1;
     document.getElementById('addonOptionDefaultInput').checked=!!o.is_default;
     document.getElementById('addonOptionHalfInput').checked=!!o.allows_half_half;
@@ -1728,7 +1770,7 @@ document.getElementById('addonOptionForm').addEventListener('submit', async (e)=
   const groupId=document.getElementById('addonOptionGroupId').value;
   const payload={
     name: document.getElementById('addonOptionNameInput').value.trim(),
-    price_diff: Number(document.getElementById('addonOptionPriceInput').value)||0,
+    price_diff: parseCurrency(document.getElementById('addonOptionPriceInput').value)||0,
     display_order: Number(document.getElementById('addonOptionOrderInput').value)||1,
     is_default: document.getElementById('addonOptionDefaultInput').checked,
     allows_half_half: document.getElementById('addonOptionHalfInput').checked
@@ -1836,12 +1878,21 @@ async function renderProdSizePrices(productId){
   container.innerHTML = sizes.map(s=>`
     <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
       <span style="flex:1; font-size:0.85rem; font-weight:600;">${s.name} <span style="color:var(--text-muted); font-weight:400;">(${s.slices}f • ${s.max_flavors} sab)</span></span>
-      <input type="number" step="0.50" data-size-id="${s.id}" placeholder="—" value="${pricesMap[s.id]!==undefined ? pricesMap[s.id] : ''}" style="width:110px; text-align:right;" />
+      <input type="text" inputmode="decimal" placeholder="0,00" data-size-id="${s.id}" value="${pricesMap[s.id]!==undefined ? formatCurrencyInput(pricesMap[s.id]) : ''}" style="width:110px; text-align:right;" />
     </div>
   `).join('');
+  container.querySelectorAll('input[data-size-id]').forEach(inp=> attachCurrencyMask(inp));
 }
 
+// Máscara de moeda - setup inicial
+function setupCurrencyMasks(){
+  attachCurrencyMask(document.getElementById('storeDeliveryFeeInput'));
+  attachCurrencyMask(document.getElementById('storeMinOrderInput'));
+  attachCurrencyMask(document.getElementById('prodPriceInput'));
+  attachCurrencyMask(document.getElementById('addonOptionPriceInput'), true);
+}
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
+  setupCurrencyMasks();
   initAuth();
 });
