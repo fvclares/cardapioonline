@@ -161,6 +161,10 @@
           <span class="admin-nav-icon">🔗</span>
           <span>Link da Loja</span>
         </button>
+        <button class="admin-nav-item" data-tab="tab-subscription" id="navTabSubscription">
+          <span class="admin-nav-icon">💳</span>
+          <span>Assinatura</span>
+        </button>
         <button class="admin-nav-item" data-tab="tab-invites" id="navTabInvites" style="display: none;">
           <span class="admin-nav-icon">✉️</span>
           <span>Convites</span>
@@ -445,6 +449,32 @@
               Envie convites por e-mail para novas pizzarias. O convite gera um link de cadastro com senha.
             </p>
             <div id="invitesListContainer"></div>
+          </div>
+        </div>
+
+        <!-- TAB: Assinatura (PIX R$29 dia 01) -->
+        <div class="tab-panel" id="tab-subscription">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h2 class="admin-card-title">💳 Assinatura — PIX R$29/mês</h2>
+              <span id="subscriptionStatusBadge" class="badge badge-primary">carregando...</span>
+            </div>
+            <div id="subscriptionCardBody">
+              <p style="color:var(--text-muted);">Carregando assinatura...</p>
+            </div>
+            <div id="subscriptionPixArea" style="display:none; margin-top:1rem; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius-md); padding:1rem;">
+              <div style="font-weight:700; margin-bottom:0.5rem;">PIX — vence dia 06 23:59</div>
+              <div id="subscriptionPixQr" style="display:flex; justify-content:center; margin-bottom:0.75rem;"></div>
+              <div style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:0.4rem;">Copia e cola:</div>
+              <div id="subscriptionPixCopy" style="background:var(--bg-card); border:1px dashed var(--border); border-radius:var(--radius-sm); padding:0.6rem; font-family:monospace; font-size:0.78rem; word-break:break-all; user-select:all;"></div>
+              <div style="display:flex; gap:0.5rem; margin-top:0.75rem; flex-wrap:wrap;">
+                <button class="btn btn-secondary btn-sm" id="btnCopyPix">📋 Copiar código</button>
+                <button class="btn btn-primary btn-sm" id="btnGeneratePix29">🔄 Gerar PIX R$29</button>
+                <button class="btn btn-primary btn-sm" id="btnGeneratePix174" style="background:linear-gradient(135deg,#ff8c00,#ffb800); color:#000; border:none;">⚡ Antecipar 6 meses — R$174</button>
+              </div>
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.5rem;">Vencimento sempre dia 01, carência até dia 06. Lembretes 03 e 05 via e-mail e WhatsApp. Trial até o próximo dia 01.</div>
+            </div>
+            <div id="subscriptionHistory" style="margin-top:1.25rem;"></div>
           </div>
         </div>
 

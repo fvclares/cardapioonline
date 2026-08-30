@@ -4,7 +4,7 @@
  * Sistema de Convites (invite-only)
  */
 
-import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi, pizzaSizesApi, productSizePricesApi } from './lib/supabase.js?v=16';
+import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi, pizzaSizesApi, productSizePricesApi, subscriptionsApi, paymentsApi } from './lib/supabase.js?v=16';
 import storage from './state/storage-supabase.js?v=16';
 
 // Expose para compatibilidade global
@@ -23,6 +23,8 @@ window.settingsApi = settingsApi;
 window.storageApi = storageApi;
 window.invitesApi = invitesApi;
 window.profilesApi = profilesApi;
+window.subscriptionsApi = subscriptionsApi;
+window.paymentsApi = paymentsApi;
 window.storage = storage;
 
 // Estado global
@@ -559,6 +561,10 @@ async function loadStoreData() {
 
   // Atualiza link público
   updatePublicUrl(store.slug);
+
+  // Garante assinatura trial até próximo dia 01
+  try { await subscriptionsApi.ensure(currentStoreId); } catch(e){ console.warn('ensure subscription falhou', e.message); }
+  renderSubscription();
 }
 
 function showPreview(containerId, url) {
@@ -566,6 +572,108 @@ function showPreview(containerId, url) {
   if (!container) return;
   container.innerHTML = `<img src="${url}" alt="Preview" style="max-width: 180px; max-height: 100px; border-radius: var(--radius-md); border: 1px solid var(--border);" />`;
 }
+
+// ============================================
+// ASSINATURA PIX R$29 dia 01 (trial até próximo 01)
+// ============================================
+async function renderSubscription(){
+  const badge=document.getElementById('subscriptionStatusBadge');
+  const body=document.getElementById('subscriptionCardBody');
+  const pixArea=document.getElementById('subscriptionPixArea');
+  const pixQr=document.getElementById('subscriptionPixQr');
+  const pixCopy=document.getElementById('subscriptionPixCopy');
+  const hist=document.getElementById('subscriptionHistory');
+  if(!badge||!body) return;
+  badge.textContent='carregando...';
+  const { data: sub, error } = await subscriptionsApi.get(currentStoreId);
+  if(error || !sub){
+    badge.textContent='sem assinatura';
+    badge.className='badge badge-closed';
+    body.innerHTML=`<p style="color:var(--text-muted);">Assinatura não encontrada. Clique em Gerar PIX para criar.</p>`;
+    if(pixArea) pixArea.style.display='block';
+    return;
+  }
+  const statusMap={ trial:{label:'🎁 Trial até próximo dia 01',cls:'badge-primary'}, active:{label:'✅ Ativa',cls:'badge-open'}, grace:{label:'⏳ Carência até dia 06',cls:'badge-primary'}, past_due:{label:'⚠️ Vencida',cls:'badge-closed'}, blocked:{label:'🚫 Bloqueada',cls:'badge-closed'}, canceled:{label:'❌ Cancelada',cls:'badge-closed'}};
+  const st=statusMap[sub.status]||{label:sub.status,cls:'badge-primary'};
+  badge.textContent=st.label;
+  badge.className='badge '+st.cls;
+  const dueFmt = sub.current_period_end ? new Date(sub.current_period_end+'T12:00:00').toLocaleDateString('pt-BR') : '-';
+  const prepaidTxt = sub.prepaid_until && new Date(sub.prepaid_until) > new Date() ? `<div style="margin-top:0.5rem; color:var(--status-open); font-weight:700;">⚡ Antecipado até ${new Date(sub.prepaid_until+'T12:00:00').toLocaleDateString('pt-BR')} — sem cobrança até lá</div>` : '';
+  body.innerHTML=`
+    <div style="display:flex; flex-wrap:wrap; gap:0.75rem; font-size:0.9rem;">
+      <span><strong>Plano:</strong> R$${Number(sub.plan_amount).toFixed(2).replace('.',',')}/mês</span>
+      <span><strong>Próximo vencimento:</strong> dia 01 — <strong>${dueFmt}</strong> (vence dia 06 23:59)</span>
+      <span><strong>Status:</strong> ${st.label}</span>
+    </div>
+    ${prepaidTxt}
+    <p style="font-size:0.82rem; color:var(--text-muted); margin-top:0.5rem;">Vencimento sempre dia 01. PIX expira dia 06 23:59. Lembretes 03 e 05 via e-mail e WhatsApp se pendente. Primeira cobrança só no próximo dia 01 (trial).</p>
+  `;
+  if(pixArea) pixArea.style.display='block';
+  // mostra PIX se houver
+  if(sub.pix_qr || sub.pix_copy_paste){
+    if(pixCopy) pixCopy.textContent=sub.pix_copy_paste||'';
+    if(pixQr){
+      if(sub.pix_qr && sub.pix_qr.startsWith('http')) pixQr.innerHTML=`<img src="${sub.pix_qr}" style="max-width:220px; border-radius:8px; border:1px solid var(--border);" />`;
+      else if(sub.pix_copy_paste) pixQr.innerHTML=`<div style="background:#fff; color:#000; padding:0.75rem; border-radius:8px; font-family:monospace; font-size:0.7rem; max-width:320px; word-break:break-all;">${sub.pix_copy_paste.slice(0,120)}...</div>`;
+      else pixQr.innerHTML='';
+    }
+  } else {
+    if(pixCopy) pixCopy.textContent='Clique em Gerar PIX R$29 para criar a cobrança deste mês.';
+    if(pixQr) pixQr.innerHTML='';
+  }
+  // histórico
+  if(hist){
+    const { data: pays } = await subscriptionsApi.listPayments(currentStoreId, 6);
+    if(pays?.length){
+      hist.innerHTML=`<div style="font-weight:700; margin-bottom:0.5rem;">Histórico (últimos ${pays.length})</div>` + pays.map(p=>{
+        const s = p.status==='approved' ? '✅ Pago' : p.status==='overdue' ? '❌ Vencido' : '⏳ Pendente';
+        const d = new Date(p.due_date+'T12:00:00').toLocaleDateString('pt-BR');
+        const amt = Number(p.amount).toFixed(2).replace('.',',');
+        return `<div style="display:flex; justify-content:space-between; font-size:0.84rem; padding:0.4rem 0; border-bottom:1px solid var(--border-light);"><span>${p.competence} — vence ${d}</span><span>R$${amt} — ${s}</span></div>`;
+      }).join('');
+    } else hist.innerHTML='<p style="font-size:0.82rem; color:var(--text-muted);">Nenhum pagamento ainda (trial).</p>';
+  }
+}
+async function generatePixMock(amount){
+  if(!currentStoreId) return;
+  showLoading(true);
+  // Mock local: cria/atualiza subscription com PIX fake (substituído pelo Edge Function + MP no futuro)
+  const due = (()=>{ const d=new Date(); d.setMonth(d.getMonth()+1); d.setDate(1); return d.toISOString().slice(0,10); })();
+  const competence = due.slice(0,7);
+  const fakeCopy = `00020126580014BR.GOV.BCB.PIX0136${currentStoreId.slice(0,16)}52040000530398654${String(amount).replace('.','')}5802BR5925${(currentStore?.name||'Pizzaria').slice(0,25)}6009SAO PAULO62070503***6304ABCD`;
+  const grace = due+'T23:59:59';
+  // upsert subscription
+  const { error: subErr } = await supabase.from('subscriptions').upsert({
+    store_id: currentStoreId,
+    plan_amount: 29.00,
+    status: amount>=174 ? 'active' : 'grace',
+    current_period_end: amount>=174 ? (()=>{ const d=new Date(due); d.setMonth(d.getMonth()+5); return d.toISOString().slice(0,10); })() : due,
+    prepaid_until: amount>=174 ? (()=>{ const d=new Date(due); d.setMonth(d.getMonth()+5); return d.toISOString().slice(0,10); })() : null,
+    pix_copy_paste: fakeCopy,
+    pix_qr: '',
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'store_id' });
+  // cria payment
+  await supabase.from('payments').upsert({
+    store_id: currentStoreId,
+    competence,
+    due_date: due,
+    grace_until: new Date(due+'T23:59:59').toISOString(),
+    amount,
+    status: 'pending',
+    pix_copy_paste: fakeCopy,
+    pix_qr: ''
+  }, { onConflict: 'store_id,competence' });
+  showLoading(false);
+  if(subErr) showToast(subErr.message,'error'); else { showToast(`PIX R$${amount.toFixed(2).replace('.',',')} gerado (mock) — vence dia 06`, 'success'); renderSubscription(); }
+}
+document.getElementById('btnGeneratePix29')?.addEventListener('click', ()=> generatePixMock(29.00));
+document.getElementById('btnGeneratePix174')?.addEventListener('click', ()=> generatePixMock(174.00));
+document.getElementById('btnCopyPix')?.addEventListener('click', ()=>{
+  const t=document.getElementById('subscriptionPixCopy')?.textContent||'';
+  if(!t) return showToast('Nada para copiar','info');
+  navigator.clipboard.writeText(t).then(()=> showToast('✅ Copia e cola copiado','success'));
+});
 
 function getBaseUrl() {
   // Preserve GitHub Pages subpath (/cardapioonline) if present

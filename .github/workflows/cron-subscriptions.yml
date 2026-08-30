@@ -1,0 +1,23 @@
+name: Cron Assinaturas (PIX dia 01, lembretes 03/05, bloqueio 06)
+
+on:
+  schedule:
+    - cron: '5 0 1 * *'   # dia 01 00:05 UTC -> gera PIX R$29 vence 06 23:59
+    - cron: '0 12 3 * *'  # dia 03 09:00 BRT (12:00 UTC) -> lembrete 1
+    - cron: '0 12 5 * *'  # dia 05 09:00 BRT -> lembrete 2
+    - cron: '5 0 6 * *'   # dia 06 00:05 UTC -> bloqueia se pending
+  workflow_dispatch:
+
+jobs:
+  cron:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Chama Edge Function cron
+        run: |
+          # Substitua pelas suas Edge Functions
+          # curl -X POST "${{ secrets.SUPABASE_URL }}/functions/v1/cron-generate-pix-01" -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+          # curl -X POST "${{ secrets.SUPABASE_URL }}/functions/v1/cron-reminder-03" -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+          # curl -X POST "${{ secrets.SUPABASE_URL }}/functions/v1/cron-reminder-05" -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+          # curl -X POST "${{ secrets.SUPABASE_URL }}/functions/v1/cron-block-06" -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+          echo "Configure SUPABASE_URL e SERVICE_ROLE_KEY nos Secrets e descomente os curls acima"

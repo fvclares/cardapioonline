@@ -663,4 +663,39 @@ export const profilesApi = {
   }
 };
 
+// ============================================
+// SUBSCRIPTIONS API - PIX R$29 dia 01, carência 06, trial até próximo 01
+// ============================================
+function nextDueDateStr(from = new Date()){
+  const d = new Date(from); d.setDate(1); d.setMonth(d.getMonth()+1);
+  return d.toISOString().slice(0,10);
+}
+export const subscriptionsApi = {
+  async get(storeId){
+    const { data, error } = await supabase.from('subscriptions').select('*').eq('store_id', storeId).maybeSingle();
+    return { data, error };
+  },
+  async ensure(storeId){
+    const { data: rpcData, error: rpcErr } = await supabase.rpc('ensure_subscription', { p_store_id: storeId });
+    if(!rpcErr) return this.get(storeId);
+    // fallback sem RPC: cria trial manual até próximo dia 01
+    const { data: existing } = await this.get(storeId);
+    if(existing) return { data: existing, error: null };
+    const due = nextDueDateStr(new Date());
+    const { data: insData, error: insErr } = await supabase.from('subscriptions').insert([{ store_id: storeId, plan_amount: 29.00, status: 'trial', current_period_start: new Date().toISOString().slice(0,10), current_period_end: due, trial_ends_at: due }]).select().single();
+    return { data: insData, error: insErr };
+  },
+  async listPayments(storeId, limit=12){
+    const { data, error } = await supabase.from('payments').select('*').eq('store_id', storeId).order('due_date', {ascending:false}).limit(limit);
+    return { data, error };
+  }
+};
+
+export const paymentsApi = {
+  async latest(storeId){
+    const { data, error } = await supabase.from('payments').select('*').eq('store_id', storeId).order('due_date', {ascending:false}).limit(1).maybeSingle();
+    return { data, error };
+  }
+};
+
 export default supabase;

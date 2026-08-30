@@ -42,6 +42,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
 
+    // 4. Checa assinatura (trial até próximo 01, bloqueio dia 06 se pending)
+    try {
+      const { subscriptionsApi } = await import('./lib/supabase.js?v=16');
+      const { data: sub } = await subscriptionsApi.get(store.id);
+      if (sub && (sub.status === 'blocked' || sub.status === 'past_due')) {
+        const due = sub.current_period_end ? new Date(sub.current_period_end+'T12:00:00').toLocaleDateString('pt-BR') : '';
+        const msg = sub.status === 'blocked'
+          ? `<h1>🚫 Loja temporariamente indisponível</h1><p>Assinatura vencida em ${due}. O lojista regulariza o PIX dia 01 (vence dia 06).</p>`
+          : `<h1>⏳ Aguardando pagamento</h1><p>Vencimento dia 01 — carência até dia 06. PIX pendente.</p>`;
+        document.getElementById('menuContainer').innerHTML = `<div class="store-closed">${msg}<p style="font-size:0.85rem; margin-top:1rem;">Entre em contato com a loja.</p></div>`;
+        document.getElementById('floatingCartBar').style.display='none';
+        loadingScreen.classList.add('hidden');
+        return;
+      }
+    } catch(e){ console.warn('check subscription falhou', e.message); }
+
     // 4. Atualiza metadados da página
     document.title = `${store.name} — Cardápio Online`;
     const ogTitle = document.querySelector('meta[property="og:title"]');
