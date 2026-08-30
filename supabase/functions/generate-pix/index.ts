@@ -34,8 +34,18 @@ serve(async (req) => {
     if (!supabaseUrl || !serviceKey) throw new Error("Supabase env faltando");
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Busca loja para description e email
-    const { data: store } = await supabase.from("stores").select("name, slug").eq("id", store_id).maybeSingle();
+    // Busca loja para description e email da própria loja (owner)
+    const { data: store } = await supabase.from("stores").select("name, slug, owner_id").eq("id", store_id).maybeSingle();
+    let ownerEmail: string | null = payer_email || null;
+    if (!ownerEmail && store?.owner_id) {
+      const { data: prof } = await supabase.from("profiles").select("email").eq("id", store.owner_id).maybeSingle();
+      if (prof?.email) ownerEmail = prof.email;
+    }
+    // fallback busca user dono via auth se profiles não tiver
+    if (!ownerEmail) {
+      const { data: ownerStore } = await supabase.from("stores").select("owner_id").eq("id", store_id).single().catch(()=>({data:null}));
+      ownerEmail = ownerEmail || (ownerStore as any)?.owner_id || null;
+    }
     const dueDate = nextDueDateISO();
     const competence = dueDate.slice(0, 7);
     const graceUntil = new Date(dueDate + "T23:59:59").toISOString();
@@ -55,13 +65,14 @@ serve(async (req) => {
       mpPaymentId = "mock_" + Date.now();
     } else {
       // Cria pagamento PIX real no MP
+      const payerEmail = (ownerEmail && ownerEmail.includes("@") ? ownerEmail : payer_email) || ownerEmail || "pagador@exemplo.com";
       const mpBody = {
         transaction_amount: amt,
         description: store ? `${store.name} - Assinatura ${competence} R$${amt}` : `Assinatura ${competence} R$${amt}`,
         payment_method_id: "pix",
         external_reference: store_id,
         notification_url: `${supabaseUrl}/functions/v1/webhook-mercadopago`,
-        payer: { email: payer_email || "pagador@exemplo.com", first_name: store?.name || "Lojista" },
+        payer: { email: payerEmail, first_name: (store?.name || "Lojista").slice(0, 30) },
         date_of_expiration: expirationISO,
       };
       const mpRes = await fetch("https://api.mercadopago.com/v1/payments", {
