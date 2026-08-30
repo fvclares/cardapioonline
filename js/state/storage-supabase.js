@@ -17,6 +17,8 @@ function normalizeProduct(p) {
     image_url: p.image_url ?? p.image,
     order: p.order ?? p.display_order,
     display_order: p.display_order ?? p.order,
+    is_featured: p.is_featured ?? p.isFeatured ?? false,
+    featured_order: p.featured_order ?? p.featuredOrder ?? 0,
   };
 }
 function normalizeCategory(c) {

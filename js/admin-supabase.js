@@ -792,12 +792,13 @@ async function renderProducts() {
   container.innerHTML = filtered.map(prod => {
     const catName = prod.categories?.name || 'Sem categoria';
     const codigoStr = prod.codigo ? String(prod.codigo).padStart(3,'0') : '—';
+    const featuredBadge = prod.is_featured ? `<span style="background:linear-gradient(135deg,#ff8c00,#ffb800); color:#000; font-size:0.68rem; font-weight:800; padding:0.15rem 0.4rem; border-radius:999px; margin-left:0.35rem;">⭐ #${prod.featured_order||1} Carrossel</span>` : '';
     return `
-      <div class="item-row">
+      <div class="item-row" ${prod.is_featured ? 'style="border-color:rgba(255,184,0,0.35); background: linear-gradient(135deg, rgba(255,184,0,0.08), transparent);"' : ''}>
         <div class="item-main">
           ${prod.image_url ? `<img src="${prod.image_url}" class="item-thumb" alt="${prod.name}" />` : ''}
           <div>
-            <div class="item-info-title"><span style="color:var(--primary); font-weight:800; margin-right:0.35rem;">#${codigoStr}</span> ${prod.name} ${!prod.available ? '<span class="badge badge-closed">Pausado</span>' : ''}</div>
+            <div class="item-info-title"><span style="color:var(--primary); font-weight:800; margin-right:0.35rem;">#${codigoStr}</span> ${prod.name} ${!prod.available ? '<span class="badge badge-closed">Pausado</span>' : ''}${featuredBadge}</div>
             <div class="item-info-meta">
               ${catName} • 
               <strong style="color: var(--secondary);">${formatCurrency(prod.base_price)}</strong>
@@ -851,9 +852,17 @@ async function openProductModal(prodId = null) {
   const crustsInput = document.getElementById('prodHasCrustsInput');
   const extrasInput = document.getElementById('prodHasExtrasInput');
   const availInput = document.getElementById('prodAvailableInput');
+  const featuredInput = document.getElementById('prodIsFeaturedInput');
+  const featuredOrderInput = document.getElementById('prodFeaturedOrderInput');
+  const featuredGroup = document.getElementById('featuredOrderGroup');
   const previewContainer = document.getElementById('prodImagePreview');
   const priceContainer = document.getElementById('prodSizePricesContainer');
   const modal = document.getElementById('productModalBackdrop');
+
+  function syncFeaturedUI(){
+    if (featuredGroup) featuredGroup.style.display = featuredInput.checked ? 'flex' : 'none';
+  }
+  featuredInput.onchange = syncFeaturedUI;
 
   updateCategoryDropdowns();
 
@@ -875,6 +884,15 @@ async function openProductModal(prodId = null) {
       crustsInput.checked = !!prod.has_crusts;
       extrasInput.checked = !!prod.has_extras;
       availInput.checked = prod.available !== false;
+      featuredInput.checked = !!prod.is_featured;
+      featuredOrderInput.value = String(prod.featured_order || 1);
+      syncFeaturedUI();
+      // valida limite 5 destaques (avisa mas não bloqueia edição do próprio)
+      if (featuredInput.checked) {
+        const { data: allF } = await productsApi.listAdmin(currentStoreId);
+        const countF = (allF||[]).filter(p=> p.is_featured && p.id!==prodId).length;
+        if (countF >= 5) showToast('⚠️ Já há 5 itens no carrossel. Desmarque outro antes.', 'info');
+      }
       // mostra precos por tamanho se pizza
       if (prod.is_pizza) {
         priceContainer.style.display = 'block';
@@ -900,6 +918,9 @@ async function openProductModal(prodId = null) {
     crustsInput.checked = true;
     extrasInput.checked = true;
     availInput.checked = true;
+    featuredInput.checked = false;
+    featuredOrderInput.value = '1';
+    syncFeaturedUI();
     priceContainer.style.display = 'none';
     document.getElementById('prodPriceInput').parentElement.style.display='block';
   }
@@ -978,6 +999,16 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
 
   const isPizza = document.getElementById('prodIsPizzaInput').checked;
   let basePriceVal = Number(document.getElementById('prodPriceInput').value) || 0;
+  // Valida limite carrossel (5 itens)
+  const wantFeatured = document.getElementById('prodIsFeaturedInput').checked;
+  if (wantFeatured) {
+    const { data: allF2 } = await productsApi.listAdmin(currentStoreId);
+    const countF2 = (allF2||[]).filter(p=> p.is_featured && p.id!==id).length;
+    if (countF2 >= 5) {
+      showToast('Limite de 5 itens no carrossel atingido. Desmarque outro produto.', 'error');
+      return;
+    }
+  }
   // Se pizza e tem tamanhos, base_price será o menor preço por tamanho (fallback)
   const productData = {
     codigo: codigoVal,
@@ -989,7 +1020,9 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
     is_pizza: isPizza,
     has_crusts: document.getElementById('prodHasCrustsInput').checked,
     has_extras: document.getElementById('prodHasExtrasInput').checked,
-    available: document.getElementById('prodAvailableInput').checked
+    available: document.getElementById('prodAvailableInput').checked,
+    is_featured: wantFeatured,
+    featured_order: Number(document.getElementById('prodFeaturedOrderInput').value) || 1
   };
 
   showLoading(true);
@@ -1000,14 +1033,27 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
   }
   let result = await trySave(productData);
   error = result.error;
-  // Fallback se coluna codigo ainda não existe no Supabase (cache de schema)
+  // Fallback se colunas codigo / is_featured ainda não existem no Supabase (cache de schema)
   let usedFallback = false;
-  if (error && error.message && error.message.includes('codigo')) {
-    console.warn('Coluna codigo ausente, tentando sem codigo...', error.message);
-    const { codigo, ...withoutCodigo } = productData;
-    result = await trySave(withoutCodigo);
+  if (error && error.message && (error.message.includes('codigo') || error.message.includes('is_featured') || error.message.includes('featured_order'))) {
+    console.warn('Coluna nova ausente, tentando sem campos novos...', error.message);
+    if (error.message.includes('is_featured') || error.message.includes('featured_order')) {
+      showToast('⚠️ Rode fix-carousel.sql no Supabase para ativar o carrossel', 'error');
+    }
+    const { codigo, is_featured, featured_order, ...withoutNew } = productData;
+    // tenta sem codigo primeiro, depois sem featured
+    if (error.message.includes('codigo')) {
+      const { is_featured: _f, featured_order: _fo, ...rest } = withoutNew;
+      result = await trySave(rest);
+    } else {
+      result = await trySave(withoutNew);
+    }
     error = result.error;
     usedFallback = !error;
+    if (!error && (error?.message?.includes('is_featured') || productData.is_featured)) {
+      // Se salvou sem featured mas queria, avisa
+      if (productData.is_featured) showToast('⚠️ Carrossel não salvo — execute fix-carousel.sql', 'info');
+    }
   }
   // Salva preços por tamanho se pizza
   if (!error && isPizza) {

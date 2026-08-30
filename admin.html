@@ -596,6 +596,24 @@
             <input type="checkbox" id="prodAvailableInput" checked style="width: auto;" />
             Produto Disponível para Venda
           </label>
+          <div style="margin-top:0.85rem; background: linear-gradient(135deg, rgba(255,184,0,0.12), rgba(255,71,34,0.10)); border:1px solid rgba(255,184,0,0.35); border-radius: var(--radius-md); padding:0.85rem;">
+            <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.92rem; font-weight:700; cursor: pointer;">
+              <input type="checkbox" id="prodIsFeaturedInput" style="width: auto;" />
+              ⭐ Destacar no carrossel do topo
+            </label>
+            <div id="featuredOrderGroup" style="display:none; margin-top:0.6rem; align-items:center; gap:0.5rem;">
+              <label class="form-label" style="margin:0; white-space:nowrap;">Ordem no carrossel</label>
+              <select id="prodFeaturedOrderInput" style="max-width:90px;">
+                <option value="1">1º</option>
+                <option value="2">2º</option>
+                <option value="3">3º</option>
+                <option value="4">4º</option>
+                <option value="5">5º</option>
+              </select>
+              <span class="form-help" style="margin:0;">máx 5 itens</span>
+            </div>
+            <span class="form-help">Crie a categoria "🔥 Promoções" e marque aqui — o item sobe para a vitrine antes do cardápio.</span>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" id="btnCancelProduct">Cancelar</button>

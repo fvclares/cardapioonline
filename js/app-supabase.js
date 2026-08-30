@@ -72,28 +72,30 @@ document.addEventListener('DOMContentLoaded', async () => {
       window.renderHeader(headerContainer);
     }
 
+    // 6.1 Carrossel de promoções (vitrine) - antes das categorias
+    const carouselContainer = document.getElementById('carouselContainer');
+    const openProduct = (product)=>{
+      if (window.setupProductModal) {
+        const modal = window.setupProductModal();
+        modal.openModal(product);
+      }
+    };
+    if (window.renderCarousel && carouselContainer) {
+      window.renderCarousel(carouselContainer, openProduct);
+    }
+
     // 7. Renderiza navegação de categorias
     if (window.renderCategoryNav) {
       window.renderCategoryNav(navContainer, (filter) => {
         if (window.renderProductSections) {
-          window.renderProductSections(menuContainer, filter, (product) => {
-            if (window.setupProductModal) {
-              const modal = window.setupProductModal();
-              modal.openModal(product);
-            }
-          });
+          window.renderProductSections(menuContainer, filter, (product) => openProduct(product));
         }
       });
     }
 
     // 8. Renderiza seções de produtos
     if (window.renderProductSections) {
-      window.renderProductSections(menuContainer, '', (product) => {
-        if (window.setupProductModal) {
-          const modal = window.setupProductModal();
-          modal.openModal(product);
-        }
-      });
+      window.renderProductSections(menuContainer, '', (product) => openProduct(product));
     }
 
     // 9. Inicializa modais
@@ -109,6 +111,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (window.appState) {
       window.appState.subscribe(() => {
         if (window.renderHeader) window.renderHeader(headerContainer);
+        const cc = document.getElementById('carouselContainer');
+        if (window.renderCarousel && cc) {
+          const openP = (product)=>{
+            if (window.setupProductModal) {
+              const modal = window.setupProductModal();
+              modal.openModal(product);
+            }
+          };
+          window.renderCarousel(cc, openP);
+        }
       });
     }
 
