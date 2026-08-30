@@ -637,7 +637,27 @@ async function renderSubscription(){
 async function generatePixMock(amount){
   if(!currentStoreId) return;
   showLoading(true);
-  // Mock local: cria/atualiza subscription com PIX fake (substituído pelo Edge Function + MP no futuro)
+  // Tenta Edge Function generate-pix (PIX real MP); fallback mock local se falhar/sem MP token
+  try {
+    const supabaseUrl = (window.supabaseUrl || supabase?.supabaseUrl || 'https://lgeeaolymwtauasppkla.supabase.co');
+    // tenta chamar a Edge Function
+    const res = await fetch(supabaseUrl + '/functions/v1/generate-pix', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`, 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZWVhb2x5bXd0YXVhc3Bwa2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2NzQwMzcsImV4cCI6MjEwMzI1MDAzN30.RvHH6DELKFeDmM0GTemGX49u-xaBPejePm2QhXxtb6Y' },
+      body: JSON.stringify({ store_id: currentStoreId, amount, payer_email: currentUser?.email })
+    });
+    const json = await res.json();
+    if(res.ok && json.pix_copy_paste){
+      showLoading(false);
+      showToast(`PIX R$${amount.toFixed(2).replace('.',',')} gerado — vence dia 06`, 'success');
+      renderSubscription();
+      return;
+    }
+    throw new Error(json.error || 'generate-pix falhou');
+  } catch(e){
+    console.warn('generate-pix falhou, usando mock local', e.message);
+  }
+  // Fallback mock local
   const due = (()=>{ const d=new Date(); d.setMonth(d.getMonth()+1); d.setDate(1); return d.toISOString().slice(0,10); })();
   const competence = due.slice(0,7);
   const fakeCopy = `00020126580014BR.GOV.BCB.PIX0136${currentStoreId.slice(0,16)}52040000530398654${String(amount).replace('.','')}5802BR5925${(currentStore?.name||'Pizzaria').slice(0,25)}6009SAO PAULO62070503***6304ABCD`;
@@ -669,6 +689,18 @@ async function generatePixMock(amount){
 }
 document.getElementById('btnGeneratePix29')?.addEventListener('click', ()=> generatePixMock(29.00));
 document.getElementById('btnGeneratePix174')?.addEventListener('click', ()=> generatePixMock(174.00));
+// Botão de teste webhook desbloqueio (mock): simula aprovação do último pending
+const btnSim = document.createElement('button');
+btnSim.className='btn btn-secondary btn-sm'; btnSim.textContent='🧪 Simular pagamento aprovado (teste)';
+btnSim.onclick=async ()=>{
+  const { data: pay } = await supabase.from('payments').select('mp_payment_id').eq('store_id', currentStoreId).eq('status','pending').order('due_date',{ascending:false}).limit(1).maybeSingle();
+  const pid = pay?.mp_payment_id || 'mock_'+Date.now();
+  const whUrl = (supabase.supabaseUrl||'https://lgeeaolymwtauasppkla.supabase.co') + '/functions/v1/webhook-mercadopago';
+  const res = await fetch(whUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ data:{id: pid }, type:'payment'})});
+  const j=await res.json().catch(()=>({}));
+  showToast(j.unlocked?'✅ Desbloqueado! Status ativo':'Webhook: '+JSON.stringify(j).slice(0,120),'info'); renderSubscription();
+};
+document.getElementById('subscriptionPixArea')?.appendChild(btnSim);
 document.getElementById('btnCopyPix')?.addEventListener('click', ()=>{
   const t=document.getElementById('subscriptionPixCopy')?.textContent||'';
   if(!t) return showToast('Nada para copiar','info');
