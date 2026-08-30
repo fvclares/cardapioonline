@@ -899,7 +899,26 @@ async function openProductModal(prodId = null) {
   function syncFeaturedUI(){
     if (featuredGroup) featuredGroup.style.display = featuredInput.checked ? 'flex' : 'none';
   }
-  featuredInput.onchange = syncFeaturedUI;
+  featuredInput.onchange = async ()=>{
+    syncFeaturedUI();
+    if(featuredInput.checked){
+      const { data: allFToggle } = await productsApi.listAdmin(currentStoreId);
+      const featuredOthers = (allFToggle||[]).filter(p=> p.is_featured && p.id!==prodId);
+      const occupied = new Set(featuredOthers.map(p=> Number(p.featured_order)));
+      let currentVal = Number(featuredOrderInput.value)||1;
+      if(occupied.has(currentVal)){
+        const free = [1,2,3,4,5].find(n=> !occupied.has(n));
+        if(free) featuredOrderInput.value=String(free);
+      }
+      featuredOrderInput.innerHTML = [1,2,3,4,5].map(n=>{
+        const occ = featuredOthers.find(p=> Number(p.featured_order)===n);
+        const label = occ ? `${n}º — ocupado (${occ.name})` : `${n}º — livre`;
+        const disabled = occ ? ' disabled' : '';
+        const selected = Number(featuredOrderInput.value)===n ? ' selected' : '';
+        return `<option value="${n}"${disabled}${selected}>${label}</option>`;
+      }).join('');
+    }
+  };
   attachCurrencyMask(priceInput);
 
   updateCategoryDropdowns();
@@ -925,11 +944,24 @@ async function openProductModal(prodId = null) {
       featuredInput.checked = !!prod.is_featured;
       featuredOrderInput.value = String(prod.featured_order || 1);
       syncFeaturedUI();
-      // valida limite 5 destaques (avisa mas não bloqueia edição do próprio)
-      if (featuredInput.checked) {
-        const { data: allF } = await productsApi.listAdmin(currentStoreId);
-        const countF = (allF||[]).filter(p=> p.is_featured && p.id!==prodId).length;
-        if (countF >= 5) showToast('⚠️ Já há 5 itens no carrossel. Desmarque outro antes.', 'info');
+      // atualiza opções de ordem indicando ocupadas
+      {
+        const { data: allF2 } = await productsApi.listAdmin(currentStoreId);
+        const featuredOthers = (allF2||[]).filter(p=> p.is_featured && p.id!==prodId);
+        const occupied = new Map(featuredOthers.map(p=>[Number(p.featured_order), p.name]));
+        featuredOrderInput.innerHTML = [1,2,3,4,5].map(n=>{
+          const occ = occupied.get(n);
+          const label = occ ? `${n}º — ocupado (${occ})` : `${n}º — livre`;
+          const disabled = occ ? ' disabled' : '';
+          const selected = Number(featuredOrderInput.value)===n ? ' selected' : '';
+          return `<option value="${n}"${disabled}${selected}>${label}</option>`;
+        }).join('');
+        // se a ordem atual ficou ocupada (dados legados duplicados), mantém selecionável mas avisa
+        if(occupied.has(Number(prod.featured_order))){
+          featuredOrderInput.innerHTML = `<option value="${prod.featured_order}" selected>${prod.featured_order}º — atual (duplicado)</option>` + featuredOrderInput.innerHTML;
+          showToast(`⚠️ Posição #${prod.featured_order} duplicada — escolha outra livre`, 'info');
+        }
+        if (featuredOthers.length >= 5) showToast('⚠️ Já há 5 itens no carrossel. Desmarque outro antes.', 'info');
       }
       // mostra precos por tamanho se pizza
       if (prod.is_pizza) {
@@ -959,6 +991,22 @@ async function openProductModal(prodId = null) {
     featuredInput.checked = false;
     featuredOrderInput.value = '1';
     syncFeaturedUI();
+    // preenche opções livres para novo produto
+    {
+      const { data: allFNew } = await productsApi.listAdmin(currentStoreId);
+      const featuredAll = (allFNew||[]).filter(p=> p.is_featured);
+      const occupied = new Set(featuredAll.map(p=> Number(p.featured_order)));
+      let firstFree = [1,2,3,4,5].find(n=> !occupied.has(n)) || 1;
+      featuredOrderInput.innerHTML = [1,2,3,4,5].map(n=>{
+        const occ = featuredAll.find(p=> Number(p.featured_order)===n);
+        const label = occ ? `${n}º — ocupado (${occ.name})` : `${n}º — livre`;
+        const disabled = occ ? ' disabled' : '';
+        const selected = n===firstFree ? ' selected' : '';
+        return `<option value="${n}"${disabled}${selected}>${label}</option>`;
+      }).join('');
+      featuredOrderInput.value = String(firstFree);
+      if(featuredAll.length>=5) showToast('⚠️ Já há 5 itens no carrossel. Desmarque outro antes.', 'info');
+    }
     priceContainer.style.display = 'none';
     document.getElementById('prodPriceInput').parentElement.style.display='block';
   }
@@ -1037,13 +1085,19 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
 
   const isPizza = document.getElementById('prodIsPizzaInput').checked;
   let basePriceVal = parseCurrency(document.getElementById('prodPriceInput').value) || 0;
-  // Valida limite carrossel (5 itens)
+  // Valida limite e ordem única do carrossel (5 itens, ordem 1..5 sem repetir)
   const wantFeatured = document.getElementById('prodIsFeaturedInput').checked;
+  const wantedOrder = Number(document.getElementById('prodFeaturedOrderInput').value) || 1;
   if (wantFeatured) {
     const { data: allF2 } = await productsApi.listAdmin(currentStoreId);
-    const countF2 = (allF2||[]).filter(p=> p.is_featured && p.id!==id).length;
-    if (countF2 >= 5) {
+    const featuredOthers = (allF2||[]).filter(p=> p.is_featured && p.id!==id);
+    if (featuredOthers.length >= 5) {
       showToast('Limite de 5 itens no carrossel atingido. Desmarque outro produto.', 'error');
+      return;
+    }
+    const clash = featuredOthers.find(p=> Number(p.featured_order)===wantedOrder);
+    if (clash) {
+      showToast(`Posição #${wantedOrder} já ocupada por "${clash.name}". Escolha outra ordem livre.`, 'error');
       return;
     }
   }
