@@ -75,14 +75,17 @@ serve(async (req) => {
         payer: { email: payerEmail, first_name: (store?.name || "Lojista").slice(0, 30) },
         date_of_expiration: expirationISO,
       };
+      const idemKey = `${store_id}-${competence}-${Date.now()}-${crypto.randomUUID()}`;
       const mpRes = await fetch("https://api.mercadopago.com/v1/payments", {
         method: "POST",
-        headers: { Authorization: `Bearer ${mpToken}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${mpToken}`, "Content-Type": "application/json", "X-Idempotency-Key": idemKey },
         body: JSON.stringify(mpBody),
       });
-      const mpData = await mpRes.json();
+      const mpText = await mpRes.text();
+      let mpData: any; try { mpData = JSON.parse(mpText); } catch { mpData = { raw: mpText }; }
+      console.log("MP request", JSON.stringify(mpBody), "MP response", mpRes.status, mpText);
       if (!mpRes.ok) {
-        throw new Error(`MP erro ${mpRes.status}: ${JSON.stringify(mpData)}`);
+        throw new Error(`MP erro ${mpRes.status}: ${mpText}`);
       }
       // PIX copia e cola e QR estão em point_of_interaction
       pixCopy = mpData.point_of_interaction?.transaction_data?.qr_code || mpData.point_of_interaction?.transaction_data?.qr_code_base64 || "";
