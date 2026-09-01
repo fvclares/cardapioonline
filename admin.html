@@ -161,6 +161,10 @@
           <span class="admin-nav-icon">📍</span>
           <span>Bairros / Taxas</span>
         </button>
+        <button class="admin-nav-item" data-tab="tab-offers">
+          <span class="admin-nav-icon">🎁</span>
+          <span>Promoções e Combos</span>
+        </button>
         <button class="admin-nav-item" data-tab="tab-share">
           <span class="admin-nav-icon">🔗</span>
           <span>Link da Loja</span>
@@ -453,6 +457,22 @@
               Cadastre os bairros que você atende e a taxa de cada um. Com <strong>0 ou 1 bairro</strong> o cliente paga a <strong>Taxa Padrão</strong> (Configurações). Com <strong>&gt;1 bairro</strong> o seletor <em>“Selecione seu Bairro para a Taxa de Entrega”</em> aparece no carrinho e cobra a taxa do bairro escolhido.
             </p>
             <div id="neighborhoodsListContainer"></div>
+          </div>
+        </div>
+
+        <!-- TAB: Promoções e Combos (Motor de Ofertas) -->
+        <div class="tab-panel" id="tab-offers">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h2 class="admin-card-title">🎁 Promoções e Combos — Motor de Ofertas</h2>
+              <button class="btn btn-primary btn-sm" id="btnNewOffer">
+                + Nova Oferta
+              </button>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 1.25rem; font-size: 0.9rem;">
+              Crie ofertas por regras: defina preço fechado e grupos de seleção (ex: 4 salgadas + 1 doce). Suporta <strong>extra por item</strong> e <strong>janela temporal</strong> (dia/horário). Vazio em validade = sempre ativo.
+            </p>
+            <div id="offersListContainer"></div>
           </div>
         </div>
 
@@ -877,6 +897,94 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" id="btnCancelNeighborhood">Cancelar</button>
           <button type="submit" class="btn btn-primary">Salvar Bairro</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Oferta (header) -->
+  <div id="offerModalBackdrop" class="modal-backdrop">
+    <div class="modal-sheet" style="max-width: 560px;">
+      <div class="modal-header">
+        <div class="modal-title" id="offerModalTitle">Nova Oferta</div>
+        <button class="modal-close-btn" id="btnCloseOfferModal">✕</button>
+      </div>
+      <form id="offerForm">
+        <div class="modal-body">
+          <input type="hidden" id="offerEditId" />
+          <div class="form-group" style="margin-bottom:1rem;">
+            <label class="form-label">Nome *</label>
+            <input type="text" id="offerNameInput" placeholder="Ex: Combo Família" required />
+          </div>
+          <div class="form-group" style="margin-bottom:1rem;">
+            <label class="form-label">Descrição</label>
+            <textarea id="offerDescriptionInput" rows="2" placeholder="Ex: 4 salgadas + 1 doce" style="resize:none;"></textarea>
+          </div>
+          <div class="form-grid form-grid-2" style="margin-bottom:1rem;">
+            <div class="form-group">
+              <label class="form-label">Preço fechado (R$) *</label>
+              <input type="text" inputmode="decimal" placeholder="0,00" id="offerPriceInput" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Ordem</label>
+              <input type="number" id="offerOrderInput" value="1" min="1" />
+            </div>
+          </div>
+          <div class="form-grid form-grid-2" style="margin-bottom:1rem;">
+            <div class="form-group">
+              <label class="form-label">Máx por pedido</label>
+              <input type="number" id="offerMaxPerOrderInput" placeholder="vazio = ilimitado" min="1" />
+            </div>
+            <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; padding-top:1.4rem;">
+              <input type="checkbox" id="offerActiveInput" checked style="width:auto;" /> Ativa
+            </label>
+          </div>
+          <div style="background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius-md); padding:0.75rem; margin-bottom:1rem;">
+            <div class="form-label" style="margin-bottom:0.4rem;">Validade (opcional — vazio = sempre)</div>
+            <div id="offerSchedulesContainer" style="display:flex; flex-direction:column; gap:0.4rem;"></div>
+            <button type="button" class="btn btn-secondary btn-sm" id="btnAddOfferSchedule" style="margin-top:0.5rem;">+ Janela (dia + horário)</button>
+            <div class="form-help">Ex: Segunda 18:00-23:00. Várias janelas = OR.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btnCancelOffer">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Oferta</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Grupo da Oferta -->
+  <div id="offerGroupModalBackdrop" class="modal-backdrop">
+    <div class="modal-sheet" style="max-width: 620px; max-height: 85vh; overflow:auto;">
+      <div class="modal-header">
+        <div class="modal-title" id="offerGroupModalTitle">Novo Grupo</div>
+        <button class="modal-close-btn" id="btnCloseOfferGroupModal">✕</button>
+      </div>
+      <form id="offerGroupForm">
+        <div class="modal-body">
+          <input type="hidden" id="offerGroupEditId" />
+          <input type="hidden" id="offerGroupOfferId" />
+          <div class="form-grid form-grid-2" style="margin-bottom:1rem;">
+            <div class="form-group">
+              <label class="form-label">Nome do grupo *</label>
+              <input type="text" id="offerGroupNameInput" placeholder="Ex: Escolha 4 salgadas" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Quantidade obrigatória *</label>
+              <input type="number" id="offerGroupQuantityInput" value="1" min="1" required />
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0.6rem;">
+            <label class="form-label">Filtrar por categoria</label>
+            <select id="offerGroupCategoryFilter"><option value="">Todas</option></select>
+          </div>
+          <div style="max-height:300px; overflow:auto; border:1px solid var(--border); border-radius:var(--radius-md); padding:0.5rem;" id="offerGroupProductsList"></div>
+          <div class="form-help" style="margin-top:0.4rem;">Marque os produtos permitidos. Use o campo R$ ao lado para adicional dentro do combo (ex: Camarão +15,00).</div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btnCancelOfferGroup">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Grupo</button>
         </div>
       </form>
     </div>

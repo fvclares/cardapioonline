@@ -4,7 +4,7 @@
  * Sistema de Convites (invite-only)
  */
 
-import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi, pizzaSizesApi, productSizePricesApi, subscriptionsApi, paymentsApi } from './lib/supabase.js?v=16';
+import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi, pizzaSizesApi, productSizePricesApi, subscriptionsApi, paymentsApi, offersApi, offerGroupsApi, offerGroupItemsApi, offerSchedulesApi } from './lib/supabase.js?v=16';
 import storage from './state/storage-supabase.js?v=16';
 
 // Expose para compatibilidade global
@@ -18,6 +18,10 @@ window.addonOptionsApi = addonOptionsApi;
 window.pizzaSizesApi = pizzaSizesApi;
 window.productSizePricesApi = productSizePricesApi;
 window.neighborhoodsApi = neighborhoodsApi;
+window.offersApi = offersApi;
+window.offerGroupsApi = offerGroupsApi;
+window.offerGroupItemsApi = offerGroupItemsApi;
+window.offerSchedulesApi = offerSchedulesApi;
 window.ordersApi = ordersApi;
 window.settingsApi = settingsApi;
 window.storageApi = storageApi;
@@ -1556,6 +1560,7 @@ const tabTitles = {
   'tab-sizes': 'Tamanhos de Pizza',
   'tab-addons': 'Bordas & Extras',
   'tab-neighborhoods': 'Bairros e Taxas',
+  'tab-offers': 'Promoções e Combos',
   'tab-share': 'Link da Loja',
   'tab-invites': 'Gerenciar Convites',
   'tab-create-store': 'Criar Sua Loja'
@@ -1581,6 +1586,7 @@ navItems.forEach(item => {
     if (tabId === 'tab-sizes') renderPizzaSizes();
     if (tabId === 'tab-addons') renderAddons();
     if (tabId === 'tab-neighborhoods') renderNeighborhoods();
+    if (tabId === 'tab-offers') renderOffers();
     if (tabId === 'tab-share') updatePublicUrl(currentStore?.slug);
     if (tabId === 'tab-invites') renderInvites();
   });
@@ -2169,6 +2175,276 @@ document.getElementById('neighborhoodForm')?.addEventListener('submit', async (e
   if(error) showToast(error.message,'error'); else { closeNeighborhoodModal(); showToast('✅ Bairro salvo!','success'); renderNeighborhoods(); }
 });
 
+// ============================================
+// OFERTAS / COMBOS - Motor por regras
+// ============================================
+const WEEKDAYS = [{v:1,label:'Seg'},{v:2,label:'Ter'},{v:3,label:'Qua'},{v:4,label:'Qui'},{v:5,label:'Sex'},{v:6,label:'Sáb'},{v:0,label:'Dom'}];
+async function renderOffers(){
+  const container=document.getElementById('offersListContainer');
+  if(!container) return;
+  if(!currentStoreId){ container.innerHTML='<p style="color:var(--text-muted);">Crie sua loja primeiro.</p>'; return; }
+  const { data, error } = await offersApi.listAll(currentStoreId);
+  if(error){ container.innerHTML=`<p style="color:var(--status-closed);">${error.message}</p>`; return; }
+  if(!data?.length){
+    container.innerHTML=`
+      <div style="text-align:center; padding:2rem; border:1px dashed var(--border); border-radius:var(--radius-md); color:var(--text-muted);">
+        <div style="font-size:2rem;">🎁</div>
+        <p style="font-weight:600; color:var(--text-secondary);">Nenhuma oferta cadastrada</p>
+        <p style="font-size:0.85rem; margin-top:0.25rem;">Ex: <strong>Combo Família R$79,90</strong> = 4 salgadas + 1 doce. Defina grupos e validade.</p>
+      </div>`;
+    return;
+  }
+  container.innerHTML = await Promise.all(data.sort((a,b)=>a.display_order-b.display_order).map(async off=>{
+    const { data: groups } = await offerGroupsApi.list(off.id).catch(()=>({data:[]}));
+    const { data: schedules } = await offerSchedulesApi.list(off.id).catch(()=>({data:[]}));
+    const schedTxt = !schedules?.length ? '<span style="color:var(--status-open);">Sempre ativo</span>' : schedules.map(s=>{
+      const lbl=WEEKDAYS.find(w=>w.v===Number(s.weekday))?.label||s.weekday;
+      return `${lbl} ${String(s.start_time).slice(0,5)}-${String(s.end_time).slice(0,5)}`;
+    }).join(', ');
+    const groupsTxt = !groups?.length ? '<em style="color:var(--status-closed);">Sem grupos — adicione</em>' : groups.map(g=>`${g.name} (x${g.quantity})`).join(' + ');
+    return `
+      <div class="admin-card" style="padding:1rem; margin-bottom:0.75rem; border:1px solid ${off.active?'var(--border)':'var(--status-closed)'}; ${!off.active?'opacity:0.6;':''}">
+        <div style="display:flex; justify-content:space-between; gap:1rem;">
+          <div>
+            <div style="font-weight:800;">${off.name} <span style="font-weight:700; color:var(--primary);">${formatCurrency(off.price)}</span> ${off.active?'':'<span class="badge badge-closed">Inativa</span>'}</div>
+            <div style="font-size:0.78rem; color:var(--text-muted);">${off.description||''}</div>
+            <div style="font-size:0.78rem; margin-top:0.3rem;">📦 ${groupsTxt}</div>
+            <div style="font-size:0.78rem;">🕒 ${schedTxt} ${off.max_per_order?`• max ${off.max_per_order}/pedido`:''}</div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:0.3rem; flex-shrink:0;">
+            <button class="btn btn-secondary btn-sm btn-edit-offer" data-id="${off.id}">✏️ Editar</button>
+            <button class="btn btn-secondary btn-sm btn-manage-groups" data-id="${off.id}">📦 Grupos</button>
+            <button class="btn btn-secondary btn-sm btn-del-offer" data-id="${off.id}" style="color:var(--status-closed);">🗑️</button>
+          </div>
+        </div>
+        <div id="offer-groups-${off.id}" style="margin-top:0.75rem;"></div>
+      </div>`;
+  })).then(arr=>arr.join(''));
+
+  container.querySelectorAll('.btn-edit-offer').forEach(b=> b.addEventListener('click', ()=> openOfferModal(b.dataset.id)));
+  container.querySelectorAll('.btn-del-offer').forEach(b=> b.addEventListener('click', ()=> deleteOffer(b.dataset.id)));
+  container.querySelectorAll('.btn-manage-groups').forEach(b=> b.addEventListener('click', ()=> toggleOfferGroups(b.dataset.id)));
+  // render groups inline after load
+  for(const off of data){
+    await renderOfferGroupsInline(off.id);
+  }
+}
+async function renderOfferGroupsInline(offerId){
+  const holder=document.getElementById(`offer-groups-${offerId}`);
+  if(!holder) return;
+  const { data: groups } = await offerGroupsApi.list(offerId).catch(()=>({data:[]}));
+  if(!groups?.length){ holder.innerHTML=`<button class="btn btn-secondary btn-sm btn-add-group" data-offer="${offerId}">+ Grupo</button>`; holder.querySelector('.btn-add-group')?.addEventListener('click', ()=> openOfferGroupModal(offerId)); return; }
+  holder.innerHTML = groups.map(g=>{
+    const items = (g.offer_group_items||[]).map(it=> it.products?.name || it.product_id.slice(0,6)).join(', ');
+    return `<div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius-md); padding:0.45rem 0.65rem; margin-bottom:0.35rem;">
+      <div style="font-size:0.82rem;"><strong>${g.name}</strong> — escolha ${g.quantity} <span style="color:var(--text-muted);">${items||'nenhum'}</span></div>
+      <div style="display:flex; gap:0.3rem;">
+        <button class="btn btn-secondary btn-sm btn-edit-group" data-offer="${offerId}" data-group="${g.id}">✏️</button>
+        <button class="btn btn-secondary btn-sm btn-del-group" data-group="${g.id}" style="color:var(--status-closed);">✕</button>
+      </div>
+    </div>`;
+  }).join('') + `<button class="btn btn-secondary btn-sm btn-add-group" data-offer="${offerId}" style="margin-top:0.3rem;">+ Grupo</button>`;
+  holder.querySelectorAll('.btn-add-group').forEach(b=> b.addEventListener('click', ()=> openOfferGroupModal(b.dataset.offer)));
+  holder.querySelectorAll('.btn-edit-group').forEach(b=> b.addEventListener('click', ()=> openOfferGroupModal(b.dataset.offer, b.dataset.group)));
+  holder.querySelectorAll('.btn-del-group').forEach(b=> b.addEventListener('click', async ()=>{ if(!confirm('Excluir grupo?')) return; showLoading(true); await offerGroupsApi.delete(b.dataset.group); showLoading(false); renderOffers(); }));
+}
+async function toggleOfferGroups(offerId){ const h=document.getElementById(`offer-groups-${offerId}`); if(h) h.scrollIntoView({behavior:'smooth'}); }
+function schedulesToRows(schedules){
+  const c=document.getElementById('offerSchedulesContainer');
+  if(!c) return;
+  c.innerHTML = (schedules||[]).map((s,idx)=>`
+    <div class="offer-schedule-row" style="display:flex; gap:0.4rem; align-items:center;">
+      <select data-idx="${idx}" data-field="weekday" style="flex:0 0 90px;">${WEEKDAYS.map(w=>`<option value="${w.v}" ${Number(s.weekday)===w.v?'selected':''}>${w.label}</option>`).join('')}</select>
+      <input type="time" data-idx="${idx}" data-field="start_time" value="${String(s.start_time).slice(0,5)}" style="flex:1;">
+      <span>-</span>
+      <input type="time" data-idx="${idx}" data-field="end_time" value="${String(s.end_time).slice(0,5)}" style="flex:1;">
+      <button type="button" class="btn btn-secondary btn-sm btn-remove-schedule" data-idx="${idx}" style="color:var(--status-closed);">✕</button>
+    </div>
+  `).join('');
+  c.querySelectorAll('.btn-remove-schedule').forEach(b=> b.addEventListener('click', ()=>{ b.closest('.offer-schedule-row').remove(); }));
+}
+function collectSchedules(){
+  const rows=document.querySelectorAll('#offerSchedulesContainer .offer-schedule-row');
+  const out=[];
+  rows.forEach(r=>{
+    const wd=r.querySelector('[data-field="weekday"]')?.value;
+    const st=r.querySelector('[data-field="start_time"]')?.value;
+    const et=r.querySelector('[data-field="end_time"]')?.value;
+    if(wd!=='' && st && et) out.push({ weekday: Number(wd), start_time: st, end_time: et });
+  });
+  return out;
+}
+async function openOfferModal(id=null){
+  const modal=document.getElementById('offerModalBackdrop');
+  const title=document.getElementById('offerModalTitle');
+  document.getElementById('offerEditId').value=id||'';
+  if(!id){
+    title.textContent='Nova Oferta';
+    document.getElementById('offerForm').reset();
+    document.getElementById('offerOrderInput').value='1';
+    document.getElementById('offerActiveInput').checked=true;
+    document.getElementById('offerPriceInput').value=formatCurrencyInput(0);
+    schedulesToRows([]);
+  } else {
+    title.textContent='Editar Oferta';
+    const { data } = await offersApi.getWithGroups(id);
+    if(!data) return;
+    document.getElementById('offerNameInput').value=data.name||'';
+    document.getElementById('offerDescriptionInput').value=data.description||'';
+    document.getElementById('offerPriceInput').value=formatCurrencyInput(data.price||0);
+    document.getElementById('offerOrderInput').value=data.display_order||1;
+    document.getElementById('offerMaxPerOrderInput').value=data.max_per_order||'';
+    document.getElementById('offerActiveInput').checked=!!data.active;
+    schedulesToRows(data.schedules||[]);
+  }
+  modal.classList.add('active');
+}
+function closeOfferModal(){ document.getElementById('offerModalBackdrop').classList.remove('active'); }
+async function deleteOffer(id){
+  if(!confirm('Excluir esta oferta e todos os grupos?')) return;
+  showLoading(true);
+  const {error}=await offersApi.delete(id);
+  showLoading(false);
+  if(error) showToast(error.message,'error'); else { showToast('🗑️ Oferta removida','success'); renderOffers(); }
+}
+document.getElementById('btnNewOffer')?.addEventListener('click', ()=> openOfferModal());
+document.getElementById('btnCloseOfferModal')?.addEventListener('click', closeOfferModal);
+document.getElementById('btnCancelOffer')?.addEventListener('click', closeOfferModal);
+document.getElementById('btnAddOfferSchedule')?.addEventListener('click', ()=>{
+  const c=document.getElementById('offerSchedulesContainer');
+  const idx=c.children.length;
+  const row=document.createElement('div');
+  row.className='offer-schedule-row';
+  row.style.cssText='display:flex; gap:0.4rem; align-items:center; margin-top:0.3rem;';
+  row.innerHTML=`<select data-idx="${idx}" data-field="weekday" style="flex:0 0 90px;">${WEEKDAYS.map(w=>`<option value="${w.v}">${w.label}</option>`).join('')}</select>
+    <input type="time" data-idx="${idx}" data-field="start_time" value="18:00" style="flex:1;"><span>-</span><input type="time" data-idx="${idx}" data-field="end_time" value="23:00" style="flex:1;">
+    <button type="button" class="btn btn-secondary btn-sm btn-remove-schedule" style="color:var(--status-closed);">✕</button>`;
+  row.querySelector('.btn-remove-schedule').addEventListener('click', ()=> row.remove());
+  c.appendChild(row);
+});
+document.getElementById('offerForm')?.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const id=document.getElementById('offerEditId').value;
+  const payload={
+    name: document.getElementById('offerNameInput').value.trim(),
+    description: document.getElementById('offerDescriptionInput').value.trim()||null,
+    price: parseCurrency(document.getElementById('offerPriceInput').value)||0,
+    display_order: Number(document.getElementById('offerOrderInput').value)||1,
+    max_per_order: Number(document.getElementById('offerMaxPerOrderInput').value)||null,
+    active: document.getElementById('offerActiveInput').checked
+  };
+  if(!payload.name) return showToast('Nome obrigatório','error');
+  showLoading(true);
+  let error, newId=id;
+  if(id){
+    const r=await offersApi.update(id, payload); error=r.error;
+    // schedules: replace all
+    if(!error){
+      const { data: existing } = await offerSchedulesApi.list(id);
+      for(const s of (existing||[])) await offerSchedulesApi.delete(s.id);
+      for(const s of collectSchedules()) await offerSchedulesApi.create(id, s);
+    }
+  } else {
+    const r=await offersApi.create(currentStoreId, { ...payload, groups:[], schedules: collectSchedules() });
+    error=r.error; if(!error) newId=r.data.id;
+  }
+  showLoading(false);
+  if(error) showToast(error.message,'error'); else { closeOfferModal(); showToast('✅ Oferta salva!','success'); renderOffers(); }
+});
+
+// Grupo
+async function openOfferGroupModal(offerId, groupId=null){
+  const modal=document.getElementById('offerGroupModalBackdrop');
+  const title=document.getElementById('offerGroupModalTitle');
+  document.getElementById('offerGroupOfferId').value=offerId;
+  document.getElementById('offerGroupEditId').value=groupId||'';
+  // populate categoria filter
+  const { data: cats } = await categoriesApi.list(currentStoreId);
+  const sel=document.getElementById('offerGroupCategoryFilter');
+  sel.innerHTML='<option value="">Todas</option>'+ (cats||[]).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  let products=[];
+  const { data: prods } = await productsApi.listAdmin(currentStoreId);
+  products=prods||[];
+  const renderList = (filterCat='')=>{
+    const list=document.getElementById('offerGroupProductsList');
+    const filtered = filterCat ? products.filter(p=> p.category_id===filterCat) : products;
+    list.innerHTML = filtered.map(p=>`
+      <label style="display:flex; align-items:center; gap:0.5rem; padding:0.3rem; border-bottom:1px solid var(--border-light);">
+        <input type="checkbox" data-product-id="${p.id}" style="width:auto;" />
+        <span style="flex:1; font-size:0.85rem;">${p.name} <span style="color:var(--text-muted);">${formatCurrency(p.base_price)}</span></span>
+        <input type="text" placeholder="+R$" data-extra="${p.id}" style="width:90px; text-align:right;" value="0,00" />
+      </label>
+    `).join('') || '<p style="color:var(--text-muted); font-size:0.85rem;">Sem produtos nesta categoria</p>';
+    list.querySelectorAll('[data-extra]').forEach(inp=> attachCurrencyMask(inp, true));
+  };
+  sel.onchange = ()=> renderList(sel.value);
+  if(!groupId){
+    title.textContent='Novo Grupo';
+    document.getElementById('offerGroupForm').reset();
+    document.getElementById('offerGroupQuantityInput').value='1';
+    renderList('');
+    // keep cat filter
+    document.getElementById('offerGroupCategoryFilter').value='';
+  } else {
+    title.textContent='Editar Grupo';
+    const { data: groups } = await offerGroupsApi.list(offerId);
+    const g=groups?.find(x=>x.id===groupId);
+    if(!g) return;
+    document.getElementById('offerGroupNameInput').value=g.name||'';
+    document.getElementById('offerGroupQuantityInput').value=g.quantity||1;
+    renderList('');
+    // check items
+    const items=(g.offer_group_items||[]);
+    setTimeout(()=>{
+      items.forEach(it=>{
+        const cb=document.querySelector(`[data-product-id="${it.product_id}"]`);
+        if(cb) cb.checked=true;
+        const inp=document.querySelector(`[data-extra="${it.product_id}"]`);
+        if(inp) inp.value=formatCurrencyInput(it.extra_price||0);
+      });
+    },50);
+  }
+  modal.classList.add('active');
+}
+function closeOfferGroupModal(){ document.getElementById('offerGroupModalBackdrop').classList.remove('active'); }
+document.getElementById('btnCloseOfferGroupModal')?.addEventListener('click', closeOfferGroupModal);
+document.getElementById('btnCancelOfferGroup')?.addEventListener('click', closeOfferGroupModal);
+document.getElementById('offerGroupForm')?.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const groupId=document.getElementById('offerGroupEditId').value;
+  const offerId=document.getElementById('offerGroupOfferId').value;
+  const name=document.getElementById('offerGroupNameInput').value.trim();
+  const quantity=Number(document.getElementById('offerGroupQuantityInput').value)||1;
+  if(!name) return showToast('Nome do grupo obrigatório','error');
+  const checked=Array.from(document.querySelectorAll('#offerGroupProductsList [data-product-id]:checked'));
+  if(!checked.length) return showToast('Selecione ao menos 1 produto','error');
+  const items=checked.map(cb=>{
+    const pid=cb.dataset.productId;
+    const extraVal=document.querySelector(`[data-extra="${pid}"]`)?.value||'0';
+    return { product_id: pid, extra_price: parseCurrency(extraVal)||0 };
+  });
+  showLoading(true);
+  let error;
+  if(groupId){
+    const r=await offerGroupsApi.update(groupId, { name, quantity }); error=r.error;
+    if(!error){
+      // replace items: delete existing then insert
+      const { data: existing } = await offerGroupItemsApi.list(groupId).catch(()=>({data:[]}));
+      // delete all
+      for(const it of (existing||[])) await offerGroupItemsApi.delete(it.id);
+      for(const it of items) await offerGroupItemsApi.upsert(groupId, it.product_id, it.extra_price);
+    }
+  } else {
+    const { data: grp, error: gErr } = await offerGroupsApi.create(offerId, { name, quantity, display_order: 1 });
+    error=gErr;
+    if(!error && grp){
+      for(const it of items) await offerGroupItemsApi.upsert(grp.id, it.product_id, it.extra_price);
+    }
+  }
+  showLoading(false);
+  if(error) showToast(error.message,'error'); else { closeOfferGroupModal(); showToast('✅ Grupo salvo!','success'); renderOffers(); }
+});
+
 // Máscara de moeda - setup inicial
 function setupCurrencyMasks(){
   attachCurrencyMask(document.getElementById('storeDeliveryFeeInput'));
@@ -2176,6 +2452,7 @@ function setupCurrencyMasks(){
   attachCurrencyMask(document.getElementById('prodPriceInput'));
   attachCurrencyMask(document.getElementById('addonOptionPriceInput'), true);
   attachCurrencyMask(document.getElementById('neighborhoodFeeInput'));
+  attachCurrencyMask(document.getElementById('offerPriceInput'));
 }
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
