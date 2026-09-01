@@ -689,18 +689,6 @@ async function generatePixMock(amount){
 }
 document.getElementById('btnGeneratePix29')?.addEventListener('click', ()=> generatePixMock(29.00));
 document.getElementById('btnGeneratePix174')?.addEventListener('click', ()=> generatePixMock(174.00));
-// Botão de teste webhook desbloqueio (mock): simula aprovação do último pending
-const btnSim = document.createElement('button');
-btnSim.className='btn btn-secondary btn-sm'; btnSim.textContent='🧪 Simular pagamento aprovado (teste)';
-btnSim.onclick=async ()=>{
-  const { data: pay } = await supabase.from('payments').select('mp_payment_id').eq('store_id', currentStoreId).eq('status','pending').order('due_date',{ascending:false}).limit(1).maybeSingle();
-  const pid = pay?.mp_payment_id || 'mock_'+Date.now();
-  const whUrl = (supabase.supabaseUrl||'https://lgeeaolymwtauasppkla.supabase.co') + '/functions/v1/webhook-mercadopago';
-  const res = await fetch(whUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ data:{id: pid }, type:'payment'})});
-  const j=await res.json().catch(()=>({}));
-  showToast(j.unlocked?'✅ Desbloqueado! Status ativo':'Webhook: '+JSON.stringify(j).slice(0,120),'info'); renderSubscription();
-};
-document.getElementById('subscriptionPixArea')?.appendChild(btnSim);
 document.getElementById('btnCopyPix')?.addEventListener('click', ()=>{
   const t=document.getElementById('subscriptionPixCopy')?.textContent||'';
   if(!t) return showToast('Nada para copiar','info');
