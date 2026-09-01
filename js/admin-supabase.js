@@ -161,6 +161,7 @@ function getScheduleFromForm(){
 }
 function isStoreOpenNow(schedule){
   if(!schedule || !Object.keys(schedule).length) return true; // sem horário = aberto
+  const map={0:'dom',1:'seg',2:'ter',3:'qua',4:'qui',5:'sex',6:'sab'};
   const now=new Date();
   const key=map[now.getDay()];
   const day=schedule[key];
