@@ -4,8 +4,8 @@
  * Sistema de Convites (invite-only)
  */
 
-import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi, pizzaSizesApi, productSizePricesApi, subscriptionsApi, paymentsApi, offersApi, offerGroupsApi, offerGroupItemsApi, offerSchedulesApi, campaignsApi } from './lib/supabase.js?v=17';
-import storage from './state/storage-supabase.js?v=17';
+import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi, pizzaSizesApi, productSizePricesApi, subscriptionsApi, paymentsApi, offersApi, offerGroupsApi, offerGroupItemsApi, offerSchedulesApi, campaignsApi } from './lib/supabase.js?v=18';
+import storage from './state/storage-supabase.js?v=18';
 
 // Expose para compatibilidade global
 window.supabase = supabase;
@@ -602,6 +602,8 @@ async function loadStoreData() {
   document.getElementById('storePhoneInput').value = store.phone || '';
   document.getElementById('storePhoneDisplayInput').value = store.phone_display || '';
   document.getElementById('storeAddressInput').value = store.address || '';
+  const obsEl = document.getElementById('storeObservationsInput');
+  if (obsEl) obsEl.value = store.description || store.observations || '';
   document.getElementById('storeDeliveryFeeInput').value = formatCurrencyInput(store.default_delivery_fee ?? 7.00);
   document.getElementById('storeMinOrderInput').value = formatCurrencyInput(store.min_order_value ?? 35.00);
   document.getElementById('storeLogoCurrentUrl').value = store.logo_url || '';
@@ -854,6 +856,7 @@ document.getElementById('storeSettingsForm').addEventListener('submit', async (e
     phone: document.getElementById('storePhoneInput').value.replace(/\D/g, ''),
     phone_display: document.getElementById('storePhoneDisplayInput').value.trim(),
     address: document.getElementById('storeAddressInput').value.trim(),
+    description: document.getElementById('storeObservationsInput')?.value.trim() || '',
     opening_hours: openingHoursText,
     default_delivery_fee: parseCurrency(document.getElementById('storeDeliveryFeeInput').value) || 0,
     min_order_value: parseCurrency(document.getElementById('storeMinOrderInput').value) || 0,

@@ -73,6 +73,7 @@ function renderHeader(container) {
 
   const coverUrl = store.cover || store.cover_url || '';
   const logoUrl = store.logo || store.logo_url || '';
+  const observations = (store.description || store.observations || '').trim();
   container.innerHTML = `
     <header class="store-header">
       <div class="store-cover" style="background-image: linear-gradient(180deg, rgba(14, 17, 23, 0.2) 0%, rgba(14, 17, 23, 0.85) 100%), url('${coverUrl}')"></div>
@@ -88,9 +89,7 @@ function renderHeader(container) {
                   <span class="pulse-dot"></span>
                   ${isOpen ? 'Aberto Agora' : 'Fechado no Momento'}
                 </span>
-                <span class="store-detail-item">
-                  🕒 ${store.opening_hours || '18h às 23h30'}
-                </span>
+                ${observations ? `<span class="store-detail-item">📝 ${observations}</span>` : ''}
               </div>
             </div>
           </div>
