@@ -2182,6 +2182,33 @@ document.getElementById('neighborhoodForm')?.addEventListener('submit', async (e
 // OFERTAS / COMBOS - Motor por regras
 // ============================================
 const WEEKDAYS = [{v:1,label:'Seg'},{v:2,label:'Ter'},{v:3,label:'Qua'},{v:4,label:'Qui'},{v:5,label:'Sex'},{v:6,label:'Sáb'},{v:0,label:'Dom'}];
+let draftOfferGroups = []; // grupos em edição dentro do modal Nova Oferta (mostra itens que farão parte do combo + lógica cliente)
+let draftEditGroupIndex = null;
+let draftOfferMode = false; // true quando grupos são editados dentro do modal da oferta (preview), false quando via card Grupos direto
+function renderDraftGroupsPreview(){
+  const container=document.getElementById('offerGroupsListPreview');
+  if(!container) return;
+  if(!draftOfferGroups.length){
+    container.innerHTML='<div style="text-align:center; padding:0.75rem; color:var(--text-muted); font-size:0.82rem; border:1px dashed var(--border); border-radius:var(--radius-md);">Nenhum grupo ainda. Clique em <strong>+ Grupo</strong> para definir o que o cliente pode escolher.<br><span style="font-size:0.72rem;">Ex: Grupo 1 → 4 Pizzas Grandes Salgadas (Calabresa, Frango...), Grupo 2 → 1 Doce</span></div>';
+    return;
+  }
+  container.innerHTML = draftOfferGroups.map((g, idx)=>{
+    const itemsTxt = (g.items||[]).map(it=> `${it.name}${it.extra_price>0?` (+${formatCurrency(it.extra_price)})`:''}`).join(', ') || '<em>nenhum item</em>';
+    return `<div style="background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-md); padding:0.55rem 0.65rem; display:flex; justify-content:space-between; gap:0.5rem; align-items:center;">
+      <div style="flex:1;">
+        <div style="font-weight:700; font-size:0.85rem;">${g.name} <span style="font-weight:400; color:var(--text-muted); font-size:0.75rem;">— escolha ${g.quantity} ${g.quantity>1?'itens':'item'}</span></div>
+        <div style="font-size:0.72rem; color:var(--text-secondary); margin-top:0.15rem;">${itemsTxt}</div>
+        <div style="font-size:0.70rem; color:var(--text-muted);">Lógica cliente: selecione exatamente ${g.quantity}</div>
+      </div>
+      <div style="display:flex; gap:0.3rem; flex-shrink:0;">
+        <button type="button" class="btn btn-secondary btn-sm btn-draft-edit" data-idx="${idx}">✏️</button>
+        <button type="button" class="btn btn-secondary btn-sm btn-draft-del" data-idx="${idx}" style="color:var(--status-closed);">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+  container.querySelectorAll('.btn-draft-edit').forEach(b=> b.addEventListener('click', ()=>{ draftEditGroupIndex=Number(b.dataset.idx); openOfferGroupModal('draft', draftOfferGroups[draftEditGroupIndex]?.__tmpId || null, true); }));
+  container.querySelectorAll('.btn-draft-del').forEach(b=> b.addEventListener('click', ()=>{ draftOfferGroups.splice(Number(b.dataset.idx),1); renderDraftGroupsPreview(); }));
+}
 async function renderOffers(){
   const container=document.getElementById('offersListContainer');
   if(!container) return;
@@ -2281,6 +2308,7 @@ async function openOfferModal(id=null){
   const modal=document.getElementById('offerModalBackdrop');
   const title=document.getElementById('offerModalTitle');
   document.getElementById('offerEditId').value=id||'';
+  draftOfferGroups=[]; draftEditGroupIndex=null; draftOfferMode=true;
   if(!id){
     title.textContent='Nova Oferta';
     document.getElementById('offerForm').reset();
@@ -2288,6 +2316,7 @@ async function openOfferModal(id=null){
     document.getElementById('offerActiveInput').checked=true;
     document.getElementById('offerPriceInput').value=formatCurrencyInput(0);
     schedulesToRows([]);
+    renderDraftGroupsPreview();
   } else {
     title.textContent='Editar Oferta';
     const { data } = await offersApi.getWithGroups(id);
@@ -2299,10 +2328,19 @@ async function openOfferModal(id=null){
     document.getElementById('offerMaxPerOrderInput').value=data.max_per_order||'';
     document.getElementById('offerActiveInput').checked=!!data.active;
     schedulesToRows(data.schedules||[]);
+    draftOfferGroups=(data.groups||[]).map(g=>({
+      name:g.name, quantity:g.quantity, display_order:g.display_order||1,
+      items:(g.offer_group_items||[]).map(it=>{
+        const prod=it.products||null;
+        return { product_id:it.product_id, name: prod?.name || it.product_id.slice(0,8), extra_price:Number(it.extra_price||0) };
+      }),
+      __existingId:g.id
+    }));
+    renderDraftGroupsPreview();
   }
   modal.classList.add('active');
 }
-function closeOfferModal(){ document.getElementById('offerModalBackdrop').classList.remove('active'); }
+function closeOfferModal(){ document.getElementById('offerModalBackdrop').classList.remove('active'); draftOfferGroups=[]; draftOfferMode=false; }
 async function deleteOffer(id){
   if(!confirm('Excluir esta oferta e todos os grupos?')) return;
   showLoading(true);
@@ -2325,6 +2363,7 @@ document.getElementById('btnAddOfferSchedule')?.addEventListener('click', ()=>{
   row.querySelector('.btn-remove-schedule').addEventListener('click', ()=> row.remove());
   c.appendChild(row);
 });
+document.getElementById('btnAddGroupInOffer')?.addEventListener('click', ()=>{ draftEditGroupIndex=null; draftOfferMode=true; openOfferGroupModal('draft', null, true); });
 document.getElementById('offerForm')?.addEventListener('submit', async (e)=>{
   e.preventDefault();
   const id=document.getElementById('offerEditId').value;
@@ -2337,30 +2376,42 @@ document.getElementById('offerForm')?.addEventListener('submit', async (e)=>{
     active: document.getElementById('offerActiveInput').checked
   };
   if(!payload.name) return showToast('Nome obrigatório','error');
+  if(!draftOfferGroups.length) return showToast('Adicione ao menos 1 grupo com itens','error');
+  for(const g of draftOfferGroups){ if(!g.items||!g.items.length) return showToast(`Grupo "${g.name}" sem itens`,'error'); }
   showLoading(true);
   let error, newId=id;
+  const groupsPayload = draftOfferGroups.map(g=>({ name:g.name, quantity:g.quantity, display_order:g.display_order||1, items: g.items.map(it=>({ product_id:it.product_id, extra_price:it.extra_price||0 })) }));
   if(id){
     const r=await offersApi.update(id, payload); error=r.error;
-    // schedules: replace all
     if(!error){
       const { data: existing } = await offerSchedulesApi.list(id);
       for(const s of (existing||[])) await offerSchedulesApi.delete(s.id);
       for(const s of collectSchedules()) await offerSchedulesApi.create(id, s);
+      // sincroniza grupos: apaga todos e recria do draft
+      const { data: existingGroups } = await offerGroupsApi.list(id);
+      for(const g of (existingGroups||[])) await offerGroupsApi.delete(g.id);
+      for(const g of groupsPayload){
+        const { data: grp, error: gErr } = await offerGroupsApi.create(id, { name:g.name, quantity:g.quantity, display_order:g.display_order });
+        if(gErr){ error=gErr; break; }
+        for(const it of g.items) await offerGroupItemsApi.upsert(grp.id, it.product_id, it.extra_price);
+      }
     }
   } else {
-    const r=await offersApi.create(currentStoreId, { ...payload, groups:[], schedules: collectSchedules() });
+    const r=await offersApi.create(currentStoreId, { ...payload, groups: groupsPayload, schedules: collectSchedules() });
     error=r.error; if(!error) newId=r.data.id;
   }
   showLoading(false);
-  if(error) showToast(error.message,'error'); else { closeOfferModal(); showToast('✅ Oferta salva!','success'); renderOffers(); }
+  if(error) showToast(error.message,'error'); else { closeOfferModal(); showToast('✅ Oferta salva com grupos!','success'); renderOffers(); }
 });
 
 // Grupo
-async function openOfferGroupModal(offerId, groupId=null){
+async function openOfferGroupModal(offerId, groupId=null, isDraftParam=false){
+  const isDraftModeLocal = isDraftParam || offerId==='draft' || (draftOfferMode && document.getElementById('offerModalBackdrop')?.classList.contains('active'));
   const modal=document.getElementById('offerGroupModalBackdrop');
   const title=document.getElementById('offerGroupModalTitle');
-  document.getElementById('offerGroupOfferId').value=offerId;
+  document.getElementById('offerGroupOfferId').value=isDraftModeLocal?'draft':offerId;
   document.getElementById('offerGroupEditId').value=groupId||'';
+  if(isDraftModeLocal) document.getElementById('offerGroupEditId').value = draftEditGroupIndex!==null ? String(draftEditGroupIndex) : '';
   // populate categoria filter
   const { data: cats } = await categoriesApi.list(currentStoreId);
   const sel=document.getElementById('offerGroupCategoryFilter');
@@ -2381,7 +2432,30 @@ async function openOfferGroupModal(offerId, groupId=null){
     list.querySelectorAll('[data-extra]').forEach(inp=> attachCurrencyMask(inp, true));
   };
   sel.onchange = ()=> renderList(sel.value);
-  if(!groupId){
+  if(isDraftModeLocal){
+    // draft: usa draftOfferGroups
+    if(draftEditGroupIndex!==null && draftOfferGroups[draftEditGroupIndex]){
+      title.textContent='Editar Grupo (combo)';
+      const g=draftOfferGroups[draftEditGroupIndex];
+      document.getElementById('offerGroupNameInput').value=g.name||'';
+      document.getElementById('offerGroupQuantityInput').value=g.quantity||1;
+      renderList('');
+      setTimeout(()=>{
+        (g.items||[]).forEach(it=>{
+          const cb=document.querySelector(`[data-product-id="${it.product_id}"]`);
+          if(cb) cb.checked=true;
+          const inp=document.querySelector(`[data-extra="${it.product_id}"]`);
+          if(inp) inp.value=formatCurrencyInput(it.extra_price||0);
+        });
+      },50);
+    } else {
+      title.textContent='Novo Grupo (combo)';
+      document.getElementById('offerGroupForm').reset();
+      document.getElementById('offerGroupQuantityInput').value='1';
+      renderList('');
+      document.getElementById('offerGroupCategoryFilter').value='';
+    }
+  } else if(!groupId){
     title.textContent='Novo Grupo';
     document.getElementById('offerGroupForm').reset();
     document.getElementById('offerGroupQuantityInput').value='1';
@@ -2424,8 +2498,24 @@ document.getElementById('offerGroupForm')?.addEventListener('submit', async (e)=
   const items=checked.map(cb=>{
     const pid=cb.dataset.productId;
     const extraVal=document.querySelector(`[data-extra="${pid}"]`)?.value||'0';
-    return { product_id: pid, extra_price: parseCurrency(extraVal)||0 };
+    // resolve nome para draft preview
+    const prodName = document.querySelector(`[data-product-id="${pid}"]`)?.parentElement?.querySelector('span')?.textContent?.trim() || pid.slice(0,8);
+    return { product_id: pid, name: prodName, extra_price: parseCurrency(extraVal)||0 };
   });
+  const isDraftSubmit = offerId==='draft' || (draftOfferMode && document.getElementById('offerModalBackdrop')?.classList.contains('active'));
+  if(isDraftSubmit){
+    // salva no draftOfferGroups (preview dentro da oferta)
+    const newGroup={ name, quantity, display_order:1, items };
+    if(draftEditGroupIndex!==null && draftOfferGroups[draftEditGroupIndex]){
+      draftOfferGroups[draftEditGroupIndex]=newGroup;
+    } else {
+      draftOfferGroups.push(newGroup);
+    }
+    closeOfferGroupModal();
+    renderDraftGroupsPreview();
+    draftEditGroupIndex=null;
+    return;
+  }
   showLoading(true);
   let error;
   if(groupId){

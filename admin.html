@@ -959,6 +959,15 @@
               <input type="checkbox" id="offerActiveInput" checked style="width:auto;" /> Ativa
             </label>
           </div>
+          <div id="offerGroupsEditor" style="margin-bottom:1rem; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius-md); padding:0.75rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+              <div class="form-label" style="margin:0;">🧩 O que o cliente pode escolher (grupos)</div>
+              <button type="button" class="btn btn-secondary btn-sm" id="btnAddGroupInOffer">+ Grupo</button>
+            </div>
+            <div id="offerGroupsListPreview" style="display:flex; flex-direction:column; gap:0.4rem;"></div>
+            <div class="form-help">Ex: Grupo 1 → escolha 4 itens da categoria Pizzas Salgadas, Grupo 2 → 1 doce. Cada grupo define quantidade e itens permitidos com adicional opcional.</div>
+          </div>
+
           <div style="background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius-md); padding:0.75rem; margin-bottom:1rem;">
             <div class="form-label" style="margin-bottom:0.4rem;">Validade (opcional — vazio = sempre)</div>
             <div id="offerSchedulesContainer" style="display:flex; flex-direction:column; gap:0.4rem;"></div>
