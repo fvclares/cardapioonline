@@ -4,7 +4,7 @@
  * Compatível com a API anterior (window.storage)
  */
 
-import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, neighborhoodsApi, ordersApi, settingsApi, pizzaSizesApi, productSizePricesApi } from '../lib/supabase.js';
+import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, neighborhoodsApi, ordersApi, settingsApi, pizzaSizesApi, productSizePricesApi, offersApi, offerGroupsApi, offerGroupItemsApi, offerSchedulesApi } from '../lib/supabase.js';
 
 // Normaliza campos Supabase -> formato legado do frontend
 function normalizeProduct(p) {
@@ -40,7 +40,8 @@ class SupabaseStorageEngine {
       neighborhoods: null,
       settings: null,
       pizzaSizes: null,
-      productSizePrices: null
+      productSizePrices: null,
+      offers: null
     };
   }
 
@@ -53,7 +54,7 @@ class SupabaseStorageEngine {
     }
     
     try {
-      const [storeResult, categoriesResult, productsResult, addonsResult, neighborhoodsResult, settingsResult, pizzaSizesResult, sizePricesResult] = await Promise.all([
+      const [storeResult, categoriesResult, productsResult, addonsResult, neighborhoodsResult, settingsResult, pizzaSizesResult, sizePricesResult, offersResult] = await Promise.all([
         storeApi.getById(storeId),
         categoriesApi.list(storeId),
         productsApi.listAdmin(storeId),
@@ -61,7 +62,8 @@ class SupabaseStorageEngine {
         neighborhoodsApi.list(storeId),
         settingsApi.get(storeId),
         pizzaSizesApi.listAll(storeId).catch(()=>({data:[]})),
-        productSizePricesApi.listByStore(storeId).catch(()=>({data:[]}))
+        productSizePricesApi.listByStore(storeId).catch(()=>({data:[]})),
+        this.fetchOffers(storeId).catch(()=>({data:[]})),
       ]);
 
       if (storeResult.error) throw storeResult.error;
@@ -108,6 +110,7 @@ class SupabaseStorageEngine {
       this._dataCache.settings = settingsResult.data || {};
       this._dataCache.pizzaSizes = pizzaSizesResult?.data || [];
       this._dataCache.productSizePrices = sizePricesResult?.data || [];
+      this._dataCache.offers = offersResult?.data || [];
       if (this._dataCache.store) {
         this._dataCache.store.neighborhoods = this._dataCache.neighborhoods;
       }
@@ -277,6 +280,44 @@ class SupabaseStorageEngine {
     const all = this._dataCache.productSizePrices || [];
     if (productId) return all.filter(r => r.product_id === productId);
     return all;
+  }
+
+  async fetchOffers(storeId){
+    const sid = storeId || this.storeId;
+    if(!sid) return { data: [] };
+    // busca offers ativas com grupos e itens
+    const { data: offers, error } = await offersApi.list(sid);
+    if(error) return { data: [] };
+    // enriquece cada oferta com grupos + itens + schedules
+    const enriched = [];
+    for(const off of (offers||[])){
+      const { data: groups } = await offerGroupsApi.list(off.id).catch(()=>({data:[]}));
+      const { data: schedules } = await offerSchedulesApi.list(off.id).catch(()=>({data:[]}));
+      // para cada grupo, busca items já veio em offerGroups? garante produtos
+      enriched.push({ ...off, groups: groups||[], schedules: schedules||[] });
+    }
+    return { data: enriched };
+  }
+  getOffers(){
+    if(this.useLocalFallback) return [];
+    return this._dataCache.offers || [];
+  }
+  getActiveOffers(now=new Date()){
+    const all = this.getOffers();
+    return all.filter(o=>{
+      if(!o.active) return false;
+      if(!o.schedules || !o.schedules.length) return true;
+      const wd = now.getDay();
+      const cur = now.getHours()*60+now.getMinutes();
+      return o.schedules.some(s=>{
+        if(Number(s.weekday)!==wd) return false;
+        const [sh,sm]=String(s.start_time).split(':').map(Number);
+        const [eh,em]=String(s.end_time).split(':').map(Number);
+        const start=sh*60+sm, end=eh*60+em;
+        if(end<start) return cur>=start || cur<=end;
+        return cur>=start && cur<=end;
+      });
+    });
   }
 
   // --- Customer (sempre local, por dispositivo) ---

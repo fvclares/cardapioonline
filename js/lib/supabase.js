@@ -698,4 +698,91 @@ export const paymentsApi = {
   }
 };
 
+// ============================================
+// OFFERS API - Motor de ofertas por regras
+// ============================================
+export const offersApi = {
+  async list(storeId){
+    const { data, error } = await supabase.from('offers').select('*').eq('store_id', storeId).eq('active', true).order('display_order');
+    return { data, error };
+  },
+  async listAll(storeId){
+    const { data, error } = await supabase.from('offers').select('*').eq('store_id', storeId).order('display_order');
+    return { data, error };
+  },
+  async getWithGroups(offerId){
+    const { data: offer, error: oErr } = await supabase.from('offers').select('*').eq('id', offerId).single();
+    if(oErr) return { data: null, error: oErr };
+    const { data: groups } = await supabase.from('offer_groups').select('*, offer_group_items(*, products(name, base_price))').eq('offer_id', offerId).order('display_order');
+    const { data: schedules } = await supabase.from('offer_schedules').select('*').eq('offer_id', offerId);
+    return { data: { ...offer, groups: groups||[], schedules: schedules||[] }, error: null };
+  },
+  async create(storeId, payload){
+    // payload: {name, description, price, active, max_per_order, display_order, groups:[{name, quantity, items:[{product_id, extra_price}]} ], schedules:[{weekday, start_time, end_time}]}
+    const { groups, schedules, ...offerData } = payload;
+    const { data: offer, error: oErr } = await supabase.from('offers').insert([{ ...offerData, store_id: storeId }]).select().single();
+    if(oErr) return { data:null, error:oErr };
+    if(groups?.length){
+      for(const g of groups){
+        const { items, ...gData } = g;
+        const { data: grp, error: gErr } = await supabase.from('offer_groups').insert([{ ...gData, offer_id: offer.id }]).select().single();
+        if(gErr) return { data:null, error:gErr };
+        if(items?.length){
+          const rows = items.map(it=>({ group_id: grp.id, product_id: it.product_id, extra_price: it.extra_price||0 }));
+          const { error: iErr } = await supabase.from('offer_group_items').insert(rows);
+          if(iErr) return { data:null, error:iErr };
+        }
+      }
+    }
+    if(schedules?.length){
+      const rows = schedules.map(s=>({ offer_id: offer.id, weekday: s.weekday, start_time: s.start_time, end_time: s.end_time }));
+      const { error: sErr } = await supabase.from('offer_schedules').insert(rows);
+      if(sErr) return { data:null, error:sErr };
+    }
+    return { data: offer, error: null };
+  },
+  async update(id, updates){
+    const { groups, schedules, ...offerData } = updates;
+    const { data, error } = await supabase.from('offers').update(offerData).eq('id', id).select().single();
+    return { data, error };
+  },
+  async delete(id){
+    const { error } = await supabase.from('offers').delete().eq('id', id);
+    return { error };
+  },
+  async isActiveNow(offer, now=new Date()){
+    if(!offer.active) return false;
+    if(!offer.schedules || !offer.schedules.length) return true;
+    const wd = now.getDay();
+    const cur = now.getHours()*60+now.getMinutes();
+    return offer.schedules.some(s=>{
+      if(s.weekday !== wd) return false;
+      const [sh,sm]=s.start_time.split(':').map(Number);
+      const [eh,em]=s.end_time.split(':').map(Number);
+      const start=sh*60+sm, end=eh*60+em;
+      if(end<start) return cur>=start || cur<=end;
+      return cur>=start && cur<=end;
+    });
+  }
+};
+
+export const offerGroupsApi = {
+  async list(offerId){ const { data, error } = await supabase.from('offer_groups').select('*, offer_group_items(*)').eq('offer_id', offerId).order('display_order'); return { data, error }; },
+  async create(offerId, payload){ const { data, error } = await supabase.from('offer_groups').insert([{ ...payload, offer_id: offerId }]).select().single(); return { data, error }; },
+  async update(id, updates){ const { data, error } = await supabase.from('offer_groups').update(updates).eq('id', id).select().single(); return { data, error }; },
+  async delete(id){ const { error } = await supabase.from('offer_groups').delete().eq('id', id); return { error }; }
+};
+
+export const offerGroupItemsApi = {
+  async list(groupId){ const { data, error } = await supabase.from('offer_group_items').select('*').eq('group_id', groupId); return { data, error }; },
+  async upsert(groupId, productId, extra_price=0){ const { data, error } = await supabase.from('offer_group_items').upsert({ group_id: groupId, product_id: productId, extra_price }, { onConflict: 'group_id,product_id' }).select().single(); return { data, error }; },
+  async delete(id){ const { error } = await supabase.from('offer_group_items').delete().eq('id', id); return { error }; }
+};
+
+export const offerSchedulesApi = {
+  async list(offerId){ const { data, error } = await supabase.from('offer_schedules').select('*').eq('offer_id', offerId).order('weekday'); return { data, error }; },
+  async create(offerId, payload){ const { data, error } = await supabase.from('offer_schedules').insert([{ ...payload, offer_id: offerId }]).select().single(); return { data, error }; },
+  async delete(id){ const { error } = await supabase.from('offer_schedules').delete().eq('id', id); return { error }; }
+};
+
 export default supabase;
