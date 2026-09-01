@@ -20,26 +20,30 @@ const whatsappService = {
     lines.push(`*TELEFONE:* ${cs ? cs.formatPhone(order.customer.phone) : order.customer.phone}`);
     lines.push(``);
 
-    // Itens do Pedido
+    // Itens do Pedido — um item por linha para facilitar leitura
     lines.push(`*ITENS DO PEDIDO:*`);
     order.items.forEach((item, index) => {
       const codigoStr = item.productCodigo ? `#${String(item.productCodigo).padStart(3,'0')} ` : '';
-      lines.push(`${item.quantity}x *${codigoStr}${item.productName}*`);
+      const qty = item.quantity || 1;
+      lines.push(`${qty}x *${codigoStr}${item.productName}*`);
       
       if (item.isOffer && item.offerGroups) {
         item.offerGroups.forEach(g=>{
-          const names = g.items.map(it=> it.name + (it.extra_price>0?` (+${cs?cs.formatCurrency(it.extra_price):'R$ '+it.extra_price})`:'' )).join(', ');
-          lines.push(`   - ${g.groupName} x${g.quantity}: ${names}`);
+          lines.push(`   - ${g.groupName}:`);
+          g.items.forEach(it=>{
+            lines.push(`     • ${it.name}${it.extra_price>0?` (+${cs?cs.formatCurrency(it.extra_price):'R$ '+it.extra_price})`:''}`);
+          });
         });
-        if(item.offerPrice) lines.push(`   - Preço combo: ${cs?cs.formatCurrency(item.offerPrice):'R$ '+item.offerPrice}${item.unitPrice>item.offerPrice?` + extras = ${cs?cs.formatCurrency(item.unitPrice):'R$ '+item.unitPrice}`:''}`);
+        if(item.offerPrice) lines.push(`   - Preço combo: ${cs?cs.formatCurrency(item.offerPrice):'R$ '+item.offerPrice}${item.unitPrice>item.offerPrice?` + extras = ${cs?cs.formatCurrency(item.unitPrice - item.offerPrice):'R$ '+(item.unitPrice-item.offerPrice)}`:''}`);
       } else {
         if (item.crust && item.crust.name && item.crust.price > 0) {
           lines.push(`   - Borda: ${item.crust.name} (+ ${cs ? cs.formatCurrency(item.crust.price) : 'R$ ' + item.crust.price})`);
         }
-        
         if (item.extras && item.extras.length > 0) {
-          const extraNames = item.extras.map(e => `${e.name} (+ ${cs ? cs.formatCurrency(e.price) : 'R$ ' + e.price})`).join(', ');
-          lines.push(`   - Extras: ${extraNames}`);
+          lines.push(`   - Extras:`);
+          item.extras.forEach(e => {
+            lines.push(`     • ${e.name} (+ ${cs ? cs.formatCurrency(e.price) : 'R$ ' + e.price})`);
+          });
         }
       }
 
