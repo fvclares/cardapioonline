@@ -155,8 +155,7 @@ function getScheduleFromForm(){
   return out;
 }
 function isStoreOpenNow(schedule){
-  if(!schedule) return true; // sem horário = aberto
-  const map={0:'dom',1:'seg',2:'ter',3:'qua',4:'qui',5:'sex',6:'sab'};
+  if(!schedule || !Object.keys(schedule).length) return true; // sem horário = aberto
   const now=new Date();
   const key=map[now.getDay()];
   const day=schedule[key];
@@ -169,11 +168,15 @@ function isStoreOpenNow(schedule){
   return cur>=open && cur<=close;
 }
 function scheduleToText(schedule){
-  if(!schedule) return '';
-  return WEEK_DAYS.filter(d=> !schedule[d.key]?.closed).map(d=>{
+  if(!schedule || !Object.keys(schedule).length) return '';
+  return WEEK_DAYS.filter(d=> {
     const v=schedule[d.key];
+    return v && v.closed===false;
+  }).map(d=>{
+    const v=schedule[d.key];
+    if(!v || !v.open || !v.close) return null;
     return `${d.label} ${v.open}-${v.close}`;
-  }).join(', ');
+  }).filter(Boolean).join(', ');
 }
 function updateComputedStatus(){
   const sch=getScheduleFromForm();
