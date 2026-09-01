@@ -209,7 +209,7 @@
         <div class="tab-panel active" id="tab-settings">
           <form id="storeSettingsForm" class="admin-card">
             <div class="admin-card-header">
-              <h2 class="admin-card-title">🏪 Informações da Pizzaria</h2>
+              <h2 class="admin-card-title">🏪 Informações do Estabelecimento</h2>
               <div style="display: flex; align-items: center; gap: 0.75rem;">
                 <label class="switch-label" style="opacity:0.7; pointer-events:none;">
                   <input type="checkbox" id="storeStatusInput" class="switch-input" disabled />
@@ -222,7 +222,7 @@
 
             <div class="form-grid form-grid-2" style="margin-bottom: 1.25rem;">
               <div class="form-group">
-                <label class="form-label">Nome da Pizzaria *</label>
+                <label class="form-label">Nome do Estabelecimento*</label>
                 <input type="text" id="storeNameInput" required />
               </div>
               <div class="form-group">
@@ -254,6 +254,11 @@
                 <label class="form-label" style="margin:0;">Horário de Atendimento</label>
                 <span style="font-size:0.75rem; color:var(--text-muted);">dias vazios = fechado</span>
               </div>
+              <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; margin-bottom:0.75rem; cursor:pointer; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-md); padding:0.5rem 0.6rem;">
+                <input type="checkbox" id="hasLunchClosureInput" style="width:auto;">
+                <span style="font-weight:600;">Fechamento para almoço</span>
+                <span style="font-size:0.72rem; color:var(--text-muted);">— 4 horários/dia quando ativo, 2 quando inativo</span>
+              </label>
               <div id="scheduleContainer" style="display:flex; flex-direction:column; gap:0.5rem;"></div>
               <input type="hidden" id="storeHoursInput" />
             </div>
@@ -550,7 +555,7 @@
             <form id="createStoreForm">
               <div class="form-grid form-grid-2" style="margin-bottom: 1.25rem;">
                 <div class="form-group">
-                  <label class="form-label">Nome da Pizzaria *</label>
+                  <label class="form-label">Nome do Estabelecimento*</label>
                   <input type="text" id="createStoreName" placeholder="Ex: Pizzaria Bella Massa" required />
                 </div>
                 <div class="form-group">

@@ -26,7 +26,7 @@ function renderCategoryNav(container, onSearch) {
       <div class="container">
         <div class="search-box">
           <span class="search-icon">🔍</span>
-          <input type="text" id="menuSearchInput" placeholder="Buscar pizza, sabor, bebida, sobremesa..." />
+          <input type="text" id="menuSearchInput" placeholder="Buscar sabor, bebida, sobremesa..." />
         </div>
         ${hasPizzas && pizzaSizes.length ? `
         <div style="display:flex; flex-direction:column; gap:0.6rem; margin-top:0.6rem;">

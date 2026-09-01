@@ -121,67 +121,152 @@ const WEEK_DAYS = [
 ];
 function renderSchedule(schedule){
   const c = document.getElementById('scheduleContainer');
+  const lunchInput = document.getElementById('hasLunchClosureInput');
   if(!c) return;
   const sch = schedule || {};
+  const hasLunch = !!sch.hasLunchClosure;
+  if(lunchInput){
+    lunchInput.checked = hasLunch;
+    if(!lunchInput._bound){
+      lunchInput._bound = true;
+      lunchInput.addEventListener('change', ()=>{
+        const current = {};
+        WEEK_DAYS.forEach(d=>{
+          const open = c.querySelector(`input[data-day="${d.key}"][data-type="open"]`)?.value || '';
+          const close = c.querySelector(`input[data-day="${d.key}"][data-type="close"]`)?.value || '';
+          const open2 = c.querySelector(`input[data-day="${d.key}"][data-type="open2"]`)?.value || '';
+          const close2 = c.querySelector(`input[data-day="${d.key}"][data-type="close2"]`)?.value || '';
+          current[d.key] = { open, close, open2, close2 };
+        });
+        current.hasLunchClosure = lunchInput.checked;
+        renderSchedule(current);
+        updateComputedStatus();
+      });
+    }
+  }
   c.innerHTML = WEEK_DAYS.map(d=>{
-    const v = sch[d.key] || { closed: true };
-    const closed = v.closed !== false; // default fechado se não definido
-    return `
+    const v = sch[d.key] || {};
+    let open = v.open || '';
+    let close = v.close || '';
+    let open2 = v.open2 || v.open_2 || '';
+    let close2 = v.close2 || v.close_2 || '';
+    if(v.closed === true){ open=''; close=''; open2=''; close2=''; }
+    if(hasLunch){
+      return `
+    <div style="display:flex; align-items:center; gap:0.5rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-md); padding:0.5rem 0.6rem; flex-wrap:wrap;">
+      <span style="width:70px; font-weight:700; font-size:0.85rem;">${d.label}</span>
+      <input type="time" data-day="${d.key}" data-type="open" value="${open}" style="flex:1; min-width:90px; padding:0.4rem;">
+      <span style="color:var(--text-muted); font-size:0.85rem;">às</span>
+      <input type="time" data-day="${d.key}" data-type="close" value="${close}" style="flex:1; min-width:90px; padding:0.4rem;">
+      <span style="color:var(--text-muted); font-size:0.85rem;">e</span>
+      <input type="time" data-day="${d.key}" data-type="open2" value="${open2}" style="flex:1; min-width:90px; padding:0.4rem;">
+      <span style="color:var(--text-muted); font-size:0.85rem;">às</span>
+      <input type="time" data-day="${d.key}" data-type="close2" value="${close2}" style="flex:1; min-width:90px; padding:0.4rem;">
+    </div>`;
+    } else {
+      return `
     <div style="display:flex; align-items:center; gap:0.5rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-md); padding:0.5rem 0.6rem;">
       <span style="width:70px; font-weight:700; font-size:0.85rem;">${d.label}</span>
-      <label style="display:flex; align-items:center; gap:0.3rem; font-size:0.8rem; margin-right:0.5rem;"><input type="checkbox" data-day="${d.key}" class="schedule-closed" ${closed?'checked':''} style="width:auto;"> Fechado</label>
-      <input type="time" data-day="${d.key}" data-type="open" value="${v.open||'18:00'}" style="flex:1; padding:0.4rem;" ${closed?'disabled':''}>
+      <input type="time" data-day="${d.key}" data-type="open" value="${open}" style="flex:1; padding:0.4rem;">
       <span style="color:var(--text-muted);">às</span>
-      <input type="time" data-day="${d.key}" data-type="close" value="${v.close||'23:00'}" style="flex:1; padding:0.4rem;" ${closed?'disabled':''}>
+      <input type="time" data-day="${d.key}" data-type="close" value="${close}" style="flex:1; padding:0.4rem;">
     </div>`;
+    }
   }).join('');
-  c.querySelectorAll('.schedule-closed').forEach(ch=>{
-    ch.addEventListener('change', (e)=>{
-      const day=e.target.dataset.day;
-      const closed=e.target.checked;
-      c.querySelectorAll(`input[data-day="${day}"][data-type]`).forEach(inp=> inp.disabled=closed);
-      updateComputedStatus();
-    });
-  });
   c.querySelectorAll('input[data-type]').forEach(inp=> inp.addEventListener('change', updateComputedStatus));
 }
 function getScheduleFromForm(){
   const c=document.getElementById('scheduleContainer');
-  const out={};
+  const lunchInput=document.getElementById('hasLunchClosureInput');
+  const hasLunch=!!lunchInput?.checked;
+  const out={ hasLunchClosure: hasLunch };
   WEEK_DAYS.forEach(d=>{
-    const closed=c.querySelector(`.schedule-closed[data-day="${d.key}"]`)?.checked;
-    if(closed) out[d.key]={ closed:true };
-    else {
-      const open=c.querySelector(`input[data-day="${d.key}"][data-type="open"]`)?.value || '18:00';
-      const close=c.querySelector(`input[data-day="${d.key}"][data-type="close"]`)?.value || '23:00';
-      out[d.key]={ closed:false, open, close };
+    if(hasLunch){
+      const open=c.querySelector(`input[data-day="${d.key}"][data-type="open"]`)?.value || '';
+      const close=c.querySelector(`input[data-day="${d.key}"][data-type="close"]`)?.value || '';
+      const open2=c.querySelector(`input[data-day="${d.key}"][data-type="open2"]`)?.value || '';
+      const close2=c.querySelector(`input[data-day="${d.key}"][data-type="close2"]`)?.value || '';
+      out[d.key]={ open, close, open2, close2 };
+    } else {
+      const open=c.querySelector(`input[data-day="${d.key}"][data-type="open"]`)?.value || '';
+      const close=c.querySelector(`input[data-day="${d.key}"][data-type="close"]`)?.value || '';
+      out[d.key]={ open, close };
     }
   });
   return out;
 }
 function isStoreOpenNow(schedule){
-  if(!schedule || !Object.keys(schedule).length) return true; // sem horário = aberto
+  if(!schedule || !Object.keys(schedule).length) return true;
+  const hasAnyDay = WEEK_DAYS.some(d=> {
+    const v=schedule[d.key];
+    if(!v) return false;
+    if(v.closed===true) return false;
+    return !!(v.open || v.close || v.open2 || v.close2);
+  });
+  const hasWeekdayKeys = WEEK_DAYS.some(d=> schedule[d.key] !== undefined);
+  if(!hasAnyDay){
+    if(hasWeekdayKeys) return false;
+    return true;
+  }
   const map={0:'dom',1:'seg',2:'ter',3:'qua',4:'qui',5:'sex',6:'sab'};
   const now=new Date();
   const key=map[now.getDay()];
   const day=schedule[key];
-  if(!day || day.closed) return false;
-  const [oh,om]= (day.open||'00:00').split(':').map(Number);
-  const [ch,cm]= (day.close||'23:59').split(':').map(Number);
+  if(!day) return false;
+  if(day.closed===true) return false;
+  if(day.closed===false && day.open && day.close && !schedule.hasLunchClosure){
+    const [oh,om]= (day.open||'00:00').split(':').map(Number);
+    const [ch,cm]= (day.close||'23:59').split(':').map(Number);
+    const cur=now.getHours()*60+now.getMinutes();
+    const open=oh*60+om, close=ch*60+cm;
+    if(close<open) return cur>=open || cur<=close;
+    return cur>=open && cur<=close;
+  }
   const cur=now.getHours()*60+now.getMinutes();
-  const open=oh*60+om, close=ch*60+cm;
-  if(close<open) return cur>=open || cur<=close; // vira noite
-  return cur>=open && cur<=close;
+  function inInterval(openStr, closeStr){
+    if(!openStr || !closeStr) return false;
+    const [oh,om]= openStr.split(':').map(Number);
+    const [ch,cm]= closeStr.split(':').map(Number);
+    if(Number.isNaN(oh)||Number.isNaN(om)||Number.isNaN(ch)||Number.isNaN(cm)) return false;
+    const open=oh*60+om, close=ch*60+cm;
+    if(close<open) return cur>=open || cur<=close;
+    return cur>=open && cur<=close;
+  }
+  const hasLunch = !!schedule.hasLunchClosure;
+  if(hasLunch){
+    if(inInterval(day.open, day.close)) return true;
+    if(inInterval(day.open2, day.close2)) return true;
+    return false;
+  } else {
+    return inInterval(day.open, day.close);
+  }
 }
 function scheduleToText(schedule){
   if(!schedule || !Object.keys(schedule).length) return '';
+  const hasLunch = !!schedule.hasLunchClosure;
   return WEEK_DAYS.filter(d=> {
     const v=schedule[d.key];
-    return v && v.closed===false;
+    if(!v) return false;
+    if(v.closed===true) return false;
+    if(v.closed===false) return !!(v.open && v.close);
+    if(hasLunch){
+      return (v.open && v.close) || (v.open2 && v.close2);
+    } else {
+      return !!(v.open && v.close);
+    }
   }).map(d=>{
     const v=schedule[d.key];
-    if(!v || !v.open || !v.close) return null;
-    return `${d.label} ${v.open}-${v.close}`;
+    if(!v) return null;
+    if(hasLunch){
+      const parts=[];
+      if(v.open && v.close) parts.push(`${v.open}-${v.close}`);
+      if(v.open2 && v.close2) parts.push(`${v.open2}-${v.close2}`);
+      if(!parts.length) return null;
+      return `${d.label} ${parts.join(', ')}`;
+    } else {
+      if(!v.open || !v.close) return null;
+      return `${d.label} ${v.open}-${v.close}`;
+    }
   }).filter(Boolean).join(', ');
 }
 function updateComputedStatus(){
