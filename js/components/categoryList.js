@@ -5,6 +5,8 @@
 
 function renderCategoryNav(container, onSearch) {
   const categories = (window.appState.categories || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+  const productsAll = (window.appState.products || window.storage?.getProducts?.() || []);
+  const hasPizzas = productsAll.some(p=> p.is_pizza && p.available!==false);
   let pizzaSizes = (window.appState.pizzaSizes || window.storage?.getPizzaSizes?.() || []).filter(s=>s.is_active!==false).sort((a,b)=>(a.display_order||0)-(b.display_order||0));
   // fallback: tenta recarregar após 500ms se ainda vazio (storage async)
   if (!pizzaSizes.length) {
@@ -26,6 +28,7 @@ function renderCategoryNav(container, onSearch) {
           <span class="search-icon">🔍</span>
           <input type="text" id="menuSearchInput" placeholder="Buscar pizza, sabor, bebida, sobremesa..." />
         </div>
+        ${hasPizzas && pizzaSizes.length ? `
         <div style="display:flex; flex-direction:column; gap:0.6rem; margin-top:0.6rem;">
           <select id="sizeFilterSelect" style="width:100%; padding:0.6rem; border-radius:var(--radius-md); border:1px solid var(--border); background:var(--bg-input); color:var(--text-primary); font-size:0.85rem;">
             <option value="">Todos os tamanhos</option>
@@ -44,7 +47,7 @@ function renderCategoryNav(container, onSearch) {
               <span>R$ 0</span><span>R$ 150</span>
             </div>
           </div>
-        </div>
+        </div>` : ''}
 
         <nav class="categories-scroll" id="categoriesNav">
           ${categories.map((cat, index) => `
