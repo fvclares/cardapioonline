@@ -65,6 +65,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (ogTitle) ogTitle.content = `${store.name} — Cardápio Online`;
     if (ogDesc) ogDesc.content = store.description || 'Faça seu pedido online!';
     if (footerStoreName) footerStoreName.textContent = store.name;
+    const footerContainer = document.getElementById('footerContainer');
+    if (footerContainer) footerContainer.style.display = 'block';
 
     // 5. Verifica se loja está aberta (considera horário por dia) — não trava a página, apenas informa status no header
     const _settings = storage.getSettings ? storage.getSettings() : {};
