@@ -15,7 +15,6 @@ function getActiveOffersForDisplay(){
   if(storage?.getActiveOffers) offers = storage.getActiveOffers(new Date());
   else if(storage?.getOffers) offers = storage.getOffers().filter(o=>o.active!==false);
   else if(state?.offers) offers = state.offers;
-  // filtra ativo já feito em getActiveOffers, mas garante
   return offers || [];
 }
 
@@ -75,11 +74,9 @@ function openOfferSelectionModal(offerId){
   const offers = getActiveOffersForDisplay();
   const offer = offers.find(o=> String(o.id)===String(offerId));
   if(!offer){ alert('Oferta não encontrada'); return; }
-  // garante groups com items
   const groups = offer.groups || [];
   if(!groups.length){ alert('Oferta sem grupos configurados'); return; }
 
-  // cria backdrop se não existe
   let backdrop = document.getElementById('offerSelectionBackdrop');
   if(!backdrop){
     backdrop = document.createElement('div');
@@ -90,10 +87,9 @@ function openOfferSelectionModal(offerId){
     backdrop.addEventListener('click', (e)=>{ if(e.target===backdrop) closeOfferSelectionModal(); });
   }
   const content = document.getElementById('offerSelectionContent');
-  const cs = window.customerService;
-  // estado de seleção: Map groupId -> Set productIds
+  // estado de seleção: Map groupId -> Map productId -> qty (permite repetir mesmo item)
   const selections = new Map();
-  groups.forEach(g=> selections.set(g.id, new Set()));
+  groups.forEach(g=> selections.set(g.id, new Map()));
 
   function productById(pid){
     return window.appState?.products?.find(p=> String(p.id)===String(pid)) || null;
@@ -107,14 +103,14 @@ function openOfferSelectionModal(offerId){
     let totalExtra = 0;
     let allValid = true;
     const groupsHtml = groups.map(g=>{
-      const sel = selections.get(g.id);
+      const selMap = selections.get(g.id);
       const need = Number(g.quantity||1);
-      const chosen = sel.size;
+      let chosen = 0;
+      selMap.forEach(q=> chosen += Number(q||0));
       const isValid = chosen===need;
       if(!isValid) allValid=false;
-      // calcula extra deste grupo
       let grpExtra=0;
-      sel.forEach(pid=> grpExtra+= extraFor(g,pid));
+      selMap.forEach((qty,pid)=> grpExtra+= extraFor(g,pid) * Number(qty||0));
       totalExtra+= grpExtra;
       const items = g.offer_group_items||[];
       return `
@@ -123,7 +119,7 @@ function openOfferSelectionModal(offerId){
             <div style="font-weight:800; font-size:0.92rem;">${g.name}</div>
             <div style="font-size:0.78rem; font-weight:700; color:${isValid?'#10b981':'#ef4444'};">${chosen}/${need} ${isValid?'✓':''}</div>
           </div>
-          <div style="font-size:0.72rem; color:var(--text-muted); margin-bottom:0.5rem;">Escolha exatamente ${need} ${need>1?'itens':'item'}</div>
+          <div style="font-size:0.72rem; color:var(--text-muted); margin-bottom:0.5rem;">Escolha exatamente ${need} ${need>1?'itens':'item'} — pode repetir o mesmo item</div>
           <div style="display:flex; flex-direction:column; gap:0.35rem;">
             ${items.map(it=>{
               const pid = it.product_id;
@@ -131,15 +127,22 @@ function openOfferSelectionModal(offerId){
               const name = prod.name || it.products?.name || 'Produto';
               const base = Number(prod.base_price|| prod.price||0);
               const extra = Number(it.extra_price||0);
-              const isChecked = sel.has(String(pid));
+              const qty = Number(selMap.get(String(pid))||0);
+              const isSelected = qty>0;
+              // verifica se pode adicionar mais
+              const canAdd = chosen < need;
               return `
-                <label style="display:flex; align-items:center; gap:0.6rem; background:var(--bg-card); border:1px solid ${isChecked?'var(--primary)':'var(--border)'}; border-radius:var(--radius-sm); padding:0.5rem 0.65rem; cursor:pointer;">
-                  <input type="checkbox" data-group="${g.id}" data-product="${pid}" ${isChecked?'checked':''} style="width:auto;" />
+                <div style="display:flex; align-items:center; gap:0.6rem; background:var(--bg-card); border:1px solid ${isSelected?'var(--primary)':'var(--border)'}; border-radius:var(--radius-sm); padding:0.5rem 0.65rem;">
                   <div style="flex:1;">
                     <div style="font-weight:600; font-size:0.85rem;">${name} ${extra>0?`<span style="color:var(--primary); font-size:0.75rem;">+${formatCurrencyOffer(extra)}</span>`:''}</div>
                     ${base?`<div style="font-size:0.72rem; color:var(--text-muted);">avulso ${formatCurrencyOffer(base)}</div>`:''}
                   </div>
-                </label>
+                  <div style="display:flex; align-items:center; gap:0.4rem;">
+                    <button type="button" class="btn-qty-minus" data-group="${g.id}" data-product="${pid}" ${qty===0?'disabled':''} style="width:32px; height:32px; border-radius:50%; border:1px solid var(--border); background:var(--bg-input); color:var(--text-primary); font-weight:800; cursor:pointer; opacity:${qty===0?'0.4':'1'};">−</button>
+                    <span style="min-width:20px; text-align:center; font-weight:800; font-size:0.9rem;">${qty}</span>
+                    <button type="button" class="btn-qty-plus" data-group="${g.id}" data-product="${pid}" ${!canAdd?'disabled':''} style="width:32px; height:32px; border-radius:50%; border:1px solid var(--primary); background:${canAdd?'var(--primary)':'var(--border)'}; color:${canAdd?'white':'var(--text-muted)'}; font-weight:800; cursor:${canAdd?'pointer':'not-allowed'}; opacity:${canAdd?'1':'0.5'};">+</button>
+                  </div>
+                </div>
               `;
             }).join('')}
           </div>
@@ -157,7 +160,7 @@ function openOfferSelectionModal(offerId){
         ${offer.description?`<p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.75rem;">${offer.description}</p>`:''}
         ${groupsHtml}
         <div style="margin-top:0.75rem; padding:0.65rem; background:${allValid?'rgba(16,185,129,0.08)':'rgba(239,68,68,0.08)'}; border:1px solid ${allValid?'rgba(16,185,129,0.25)':'rgba(239,68,68,0.25)'}; border-radius:var(--radius-md); font-size:0.82rem; text-align:center; font-weight:700; color:${allValid?'#10b981':'#ef4444'};">
-          ${allValid?'✅ Combo completo — pode adicionar ao pedido':'Selecione exatamente a quantidade de cada grupo'}
+          ${allValid?'✅ Combo completo — pode adicionar ao pedido':'Selecione exatamente a quantidade de cada grupo (pode repetir itens)'}
         </div>
       </div>
       <div class="modal-footer">
@@ -168,48 +171,56 @@ function openOfferSelectionModal(offerId){
     content.querySelector('#btnCloseOfferSelection')?.addEventListener('click', closeOfferSelectionModal);
     content.querySelector('#btnCancelOfferSelection')?.addEventListener('click', closeOfferSelectionModal);
     content.querySelector('#btnAddOfferToCart')?.addEventListener('click', ()=>{
-      // coleta seleções validadas
       const groupsPayload = groups.map(g=>{
-        const sel = Array.from(selections.get(g.id)||[]);
-        const items = sel.map(pid=>{
+        const selMap = selections.get(g.id);
+        const items = [];
+        selMap.forEach((qty,pid)=>{
           const prod = productById(pid) || { id: pid, name: pid };
           const extra = extraFor(g, pid);
-          return { product_id: pid, name: prod.name, price: Number(prod.base_price||prod.price||0), extra_price: extra };
+          const times = Number(qty||0);
+          for(let i=0;i<times;i++){
+            items.push({ product_id: pid, name: prod.name, price: Number(prod.base_price||prod.price||0), extra_price: extra });
+          }
         });
         return { groupId: g.id, groupName: g.name, quantity: Number(g.quantity), items };
       });
       const total = Number(offer.price) + totalExtra;
-      // adiciona ao carrinho via appState
       if(window.appState?.addOffer){
         window.appState.addOffer({ offer, groups: groupsPayload, total });
       } else {
-        // fallback cria item manual
         window.appState.addItem({ product: { id: offer.id, name: offer.name, price: offer.price }, quantity:1 });
       }
       closeOfferSelectionModal();
-      // feedback
       if(window.showToast) window.showToast('🎁 Combo adicionado!', 'success');
-      // abre carrinho
       window.dispatchEvent(new CustomEvent('open_cart'));
     });
-    // bind checkboxes com validação de limite
-    content.querySelectorAll('input[type="checkbox"][data-group]').forEach(cb=>{
-      cb.addEventListener('change', (e)=>{
-        const gid = e.target.dataset.group;
-        const pid = String(e.target.dataset.product);
-        const set = selections.get(gid);
+    // bind qty buttons
+    content.querySelectorAll('.btn-qty-plus').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        const gid = e.currentTarget.dataset.group;
+        const pid = String(e.currentTarget.dataset.product);
+        const selMap = selections.get(gid);
         const group = groups.find(g=> String(g.id)===String(gid));
         const need = Number(group?.quantity||1);
-        if(e.target.checked){
-          if(set.size >= need){
-            e.target.checked=false;
-            if(window.showToast) window.showToast(`Escolha apenas ${need} neste grupo`, 'info');
-            return;
-          }
-          set.add(pid);
-        } else {
-          set.delete(pid);
+        let chosen = 0; selMap.forEach(q=> chosen+=Number(q||0));
+        if(chosen >= need){
+          if(window.showToast) window.showToast(`Esse grupo já tem ${need} itens`, 'info');
+          return;
         }
+        const cur = Number(selMap.get(pid)||0);
+        selMap.set(pid, cur+1);
+        renderModal();
+      });
+    });
+    content.querySelectorAll('.btn-qty-minus').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        const gid = e.currentTarget.dataset.group;
+        const pid = String(e.currentTarget.dataset.product);
+        const selMap = selections.get(gid);
+        const cur = Number(selMap.get(pid)||0);
+        if(cur<=0) return;
+        if(cur===1) selMap.delete(pid);
+        else selMap.set(pid, cur-1);
         renderModal();
       });
     });
