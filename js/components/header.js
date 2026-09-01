@@ -73,7 +73,7 @@ function renderHeader(container) {
 
           ${!isOpen ? `
             <div class="store-notice-closed">
-              ⚠️ A pizzaria está fechada no momento. Você ainda pode montar sua sacola e enviar seu pedido para agendamento via WhatsApp.
+              ⚠️ O estabelecimento  está fechada no momento. Você ainda pode montar sua sacola e enviar seu pedido para agendamento via WhatsApp.
             </div>
           ` : ''}
 
