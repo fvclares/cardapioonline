@@ -108,16 +108,23 @@ function setupCartDrawer(onProceedToCheckout) {
         <!-- Lista de Itens da Sacola -->
         <div class="cart-items-list">
           ${items.map(item => `
-            <div class="cart-item" style="${item.fractionValue && item.fractionValue<1 ? 'border-left:3px solid #fbbf24;' : ''}">
+            <div class="cart-item" style="${item.isOffer ? 'border-left:3px solid #f59e0b; background: linear-gradient(135deg, rgba(245,158,11,0.06), transparent);' : (item.fractionValue && item.fractionValue<1 ? 'border-left:3px solid #fbbf24;' : '')}">
               <div class="cart-item-details">
-                <div class="cart-item-title">${item.productName} ${item.fractionValue && item.fractionValue<1 ? `<span style="background:#fbbf24; color:#78350f; font-size:0.65rem; font-weight:800; padding:0.15rem 0.4rem; border-radius:999px; margin-left:0.3rem; vertical-align:middle;">${item.fractionLabel|| (item.fractionValue===0.5?'½':'1/'+Math.round(1/item.fractionValue))} ${item.size? item.size.name.split('(')[0].trim():''}</span>` : ''}</div>
+                <div class="cart-item-title">${item.productName} ${item.isOffer ? `<span style="background:#f59e0b; color:#fff; font-size:0.62rem; font-weight:800; padding:0.12rem 0.35rem; border-radius:999px; margin-left:0.25rem;">COMBO</span>` : ''} ${item.fractionValue && item.fractionValue<1 ? `<span style="background:#fbbf24; color:#78350f; font-size:0.65rem; font-weight:800; padding:0.15rem 0.4rem; border-radius:999px; margin-left:0.3rem; vertical-align:middle;">${item.fractionLabel|| (item.fractionValue===0.5?'½':'1/'+Math.round(1/item.fractionValue))} ${item.size? item.size.name.split('(')[0].trim():''}</span>` : ''}</div>
+                ${item.isOffer && item.offerGroups ? `
+                  <div style="margin-top:0.25rem; display:flex; flex-direction:column; gap:0.2rem;">
+                    ${item.offerGroups.map(g=>`
+                      <div style="font-size:0.75rem; color:var(--text-secondary);"><strong>${g.groupName} x${g.quantity}:</strong> ${g.items.map(it=> `${it.name}${it.extra_price>0?` (+${cs?cs.formatCurrency(it.extra_price):'R$ '+it.extra_price})`:''}`).join(', ')}</div>
+                    `).join('')}
+                  </div>
+                ` : ''}
                 ${item.fractionValue && item.fractionValue<1 ? `<div style="font-size:0.72rem; color:#fbbf24; font-weight:600; margin-top:0.15rem;">🍕 ${item.fractionLabel} pizza — complete com outra ${item.fractionLabel} do mesmo tamanho</div>` : ''}
                 
-                ${item.crust && item.crust.name && item.crust.price > 0 ? `
+                ${!item.isOffer && item.crust && item.crust.name && item.crust.price > 0 ? `
                   <div class="cart-item-addons">🧀 Borda: ${item.crust.name} (+${cs ? cs.formatCurrency(item.crust.price) : 'R$ ' + item.crust.price})</div>
                 ` : ''}
 
-                ${item.extras && item.extras.length > 0 ? `
+                ${!item.isOffer && item.extras && item.extras.length > 0 ? `
                   <div class="cart-item-addons">🥓 Extras: ${item.extras.map(e => `${e.name} (+${cs ? cs.formatCurrency(e.price) : 'R$ ' + e.price})`).join(', ')}</div>
                 ` : ''}
 

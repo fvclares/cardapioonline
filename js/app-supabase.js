@@ -100,6 +100,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       window.renderCarousel(carouselContainer, openProduct);
     }
 
+    // 6.2 Ofertas / Combos por regras (motor de ofertas)
+    const offersContainer = document.getElementById('offersContainer');
+    if (window.renderOffersSection && offersContainer) {
+      window.renderOffersSection(offersContainer);
+    }
+
     // 7. Renderiza navegação de categorias
     if (window.renderCategoryNav) {
       window.renderCategoryNav(navContainer, (filter) => {
@@ -137,6 +143,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           };
           window.renderCarousel(cc, openP);
         }
+        const oc = document.getElementById('offersContainer');
+        if (window.renderOffersSection && oc) window.renderOffersSection(oc);
       });
     }
 

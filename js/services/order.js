@@ -28,7 +28,7 @@ const orderService = {
     const orderNumber = this.generateOrderNumber();
     const orderId = 'ord_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
 
-    // Congela itens com nomes e preços exatos no momento da compra (Módulo 06)
+    // Congela itens com nomes e preços exatos no momento da compra (Módulo 06) — inclui ofertas
     const itemsSnapshot = items.map(item => ({
       productId: item.productId,
       productName: item.productName,
@@ -38,6 +38,10 @@ const orderService = {
       crust: item.crust ? { ...item.crust } : null,
       extras: item.extras ? item.extras.map(e => ({ ...e })) : [],
       observation: item.observation || '',
+      isOffer: !!item.isOffer,
+      offerId: item.offerId || null,
+      offerGroups: item.offerGroups ? JSON.parse(JSON.stringify(item.offerGroups)) : null,
+      offerPrice: item.offerPrice != null ? Number(item.offerPrice) : null,
       itemTotal: Number(item.itemTotal)
     }));
 

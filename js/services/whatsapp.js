@@ -26,13 +26,21 @@ const whatsappService = {
       const codigoStr = item.productCodigo ? `#${String(item.productCodigo).padStart(3,'0')} ` : '';
       lines.push(`${item.quantity}x *${codigoStr}${item.productName}*`);
       
-      if (item.crust && item.crust.name && item.crust.price > 0) {
-        lines.push(`   - Borda: ${item.crust.name} (+ ${cs ? cs.formatCurrency(item.crust.price) : 'R$ ' + item.crust.price})`);
-      }
-      
-      if (item.extras && item.extras.length > 0) {
-        const extraNames = item.extras.map(e => `${e.name} (+ ${cs ? cs.formatCurrency(e.price) : 'R$ ' + e.price})`).join(', ');
-        lines.push(`   - Extras: ${extraNames}`);
+      if (item.isOffer && item.offerGroups) {
+        item.offerGroups.forEach(g=>{
+          const names = g.items.map(it=> it.name + (it.extra_price>0?` (+${cs?cs.formatCurrency(it.extra_price):'R$ '+it.extra_price})`:'' )).join(', ');
+          lines.push(`   - ${g.groupName} x${g.quantity}: ${names}`);
+        });
+        if(item.offerPrice) lines.push(`   - Preço combo: ${cs?cs.formatCurrency(item.offerPrice):'R$ '+item.offerPrice}${item.unitPrice>item.offerPrice?` + extras = ${cs?cs.formatCurrency(item.unitPrice):'R$ '+item.unitPrice}`:''}`);
+      } else {
+        if (item.crust && item.crust.name && item.crust.price > 0) {
+          lines.push(`   - Borda: ${item.crust.name} (+ ${cs ? cs.formatCurrency(item.crust.price) : 'R$ ' + item.crust.price})`);
+        }
+        
+        if (item.extras && item.extras.length > 0) {
+          const extraNames = item.extras.map(e => `${e.name} (+ ${cs ? cs.formatCurrency(e.price) : 'R$ ' + e.price})`).join(', ');
+          lines.push(`   - Extras: ${extraNames}`);
+        }
       }
 
       if (item.observation) {

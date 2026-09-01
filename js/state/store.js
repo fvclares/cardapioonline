@@ -12,6 +12,7 @@ class StoreState {
     this.pizzaSizes = [];
     this.productSizePrices = [];
     this.settings = {};
+    this.offers = [];
     this.customer = null;
     this.listeners = [];
     this._refreshing = false;
@@ -96,6 +97,9 @@ class StoreState {
       } else {
         if (this.cart.neighborhood) this.cart.neighborhood = null;
       }
+      // Ofertas
+      if(storageEngine.getOffers) this.offers = storageEngine.getOffers() || [];
+      else if(storageEngine.getActiveOffers) this.offers = storageEngine.getActiveOffers() || [];
       this._ready = true;
       this.notify();
     } catch (err) {
@@ -168,6 +172,9 @@ class StoreState {
           this.cart.neighborhood = null;
         }
       }
+      // Ofertas
+      if(storageEngine.getActiveOffers) this.offers = storageEngine.getActiveOffers() || [];
+      else if(storageEngine.getOffers) this.offers = storageEngine.getOffers() || [];
       
       this._ready = true;
       this.notify();
@@ -206,6 +213,8 @@ class StoreState {
       this.pizzaSizes = pizzaSizes || this.pizzaSizes;
       this.productSizePrices = sizePrices || this.productSizePrices;
       this.settings = settings || this.settings;
+      if(storageEngine.getActiveOffers) this.offers = storageEngine.getActiveOffers() || [];
+      else if(storageEngine.getOffers) this.offers = storageEngine.getOffers() || [];
     } catch (err) {
       console.warn('_refreshFromStorage failed:', err);
     }
@@ -493,11 +502,15 @@ class StoreState {
     if (item.quantity <= 0) {
       this.cart.items.splice(itemIndex, 1);
     } else {
-      const fv = (item.fractionValue!=null) ? Number(item.fractionValue) : 1;
-      // Para fracionada, itemTotal é proporcional para exibição; subtotal real é recalculado via _computeFractionalSubtotal
-      // Mantém proporcional para listagem, mas getSubtotal corrige via modo
-      if(fv<1) item.itemTotal = item.unitPrice * item.quantity * fv;
-      else item.itemTotal = item.unitPrice * item.quantity;
+      if(item.isOffer){
+        item.itemTotal = item.unitPrice * item.quantity;
+      } else {
+        const fv = (item.fractionValue!=null) ? Number(item.fractionValue) : 1;
+        // Para fracionada, itemTotal é proporcional para exibição; subtotal real é recalculado via _computeFractionalSubtotal
+        // Mantém proporcional para listagem, mas getSubtotal corrige via modo
+        if(fv<1) item.itemTotal = item.unitPrice * item.quantity * fv;
+        else item.itemTotal = item.unitPrice * item.quantity;
+      }
     }
 
     this.notify();
@@ -538,6 +551,32 @@ class StoreState {
     this.cart.paymentMethod = method;
     this.cart.cashChange = cashChange;
     this.notify();
+  }
+
+  // --- Ofertas / Combos por regras ---
+  addOffer({ offer, groups, total, quantity=1, observation='' }){
+    const unitPrice = Number(total ?? offer.price ?? 0);
+    const cartItem = {
+      id: 'cart_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      productId: offer.id,
+      productName: `🎁 ${offer.name}`,
+      offerId: offer.id,
+      offerName: offer.name,
+      isOffer: true,
+      offerPrice: Number(offer.price||0),
+      offerGroups: groups, // [{groupId, groupName, quantity, items:[{product_id,name,price,extra_price}]}]
+      basePrice: unitPrice,
+      unitPrice,
+      quantity,
+      observation: (observation||'').trim(),
+      crust: null,
+      extras: [],
+      fractionValue: 1,
+      itemTotal: unitPrice * quantity
+    };
+    this.cart.items.push(cartItem);
+    this.notify();
+    return cartItem;
   }
 
   // --- Cálculos Financeiros ---
