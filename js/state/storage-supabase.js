@@ -4,7 +4,7 @@
  * Compatível com a API anterior (window.storage)
  */
 
-import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, neighborhoodsApi, ordersApi, settingsApi, pizzaSizesApi, productSizePricesApi, offersApi, offerGroupsApi, offerGroupItemsApi, offerSchedulesApi, campaignsApi } from '../lib/supabase.js';
+import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, neighborhoodsApi, ordersApi, settingsApi, pizzaSizesApi, productSizePricesApi, offersApi, offerGroupsApi, offerGroupItemsApi, offerSchedulesApi, campaignsApi } from '../lib/supabase.js?v=17';
 
 // Normaliza campos Supabase -> formato legado do frontend
 function normalizeProduct(p) {

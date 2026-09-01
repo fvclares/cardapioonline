@@ -4,8 +4,8 @@
  * Sistema de Convites (invite-only)
  */
 
-import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi, pizzaSizesApi, productSizePricesApi, subscriptionsApi, paymentsApi, offersApi, offerGroupsApi, offerGroupItemsApi, offerSchedulesApi, campaignsApi } from './lib/supabase.js?v=16';
-import storage from './state/storage-supabase.js?v=16';
+import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi, pizzaSizesApi, productSizePricesApi, subscriptionsApi, paymentsApi, offersApi, offerGroupsApi, offerGroupItemsApi, offerSchedulesApi, campaignsApi } from './lib/supabase.js?v=17';
+import storage from './state/storage-supabase.js?v=17';
 
 // Expose para compatibilidade global
 window.supabase = supabase;
@@ -40,6 +40,7 @@ let currentUserProfile = null;
 let ordersSubscription = null;
 let isSuperadmin = false;
 let authInitialized = false;
+let isAuthProcessing = false;
 
 // Utilitários
 function showLoading(show) {
@@ -486,6 +487,9 @@ async function setupInviteSignup(token) {
 }
 
 async function onAuthSuccess(user) {
+  if (isAuthProcessing) return;
+  isAuthProcessing = true;
+  try {
   currentUser = user;
   console.log('✅ Usuário logado:', user.email);
 
@@ -511,6 +515,10 @@ async function onAuthSuccess(user) {
 
   // Se NÃO tem loja: primeiro login → mostra formulário criar loja
   showCreateStorePanel(user, profile);
+  } finally {
+    // libera após 800ms para evitar reentrada rápida por INITIAL_SESSION + getSession
+    setTimeout(()=>{ isAuthProcessing = false; }, 800);
+  }
 }
 
 function showAdminLayout(user) {

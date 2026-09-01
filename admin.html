@@ -254,9 +254,9 @@
                 <label class="form-label" style="margin:0;">Horário de Atendimento</label>
                 <span style="font-size:0.75rem; color:var(--text-muted);">dias vazios = fechado</span>
               </div>
-              <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; margin-bottom:0.75rem; cursor:pointer; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-md); padding:0.5rem 0.6rem;">
-                <input type="checkbox" id="hasLunchClosureInput" style="width:auto;">
-                <span style="font-weight:600;">Fechamento para almoço</span>
+              <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; margin-bottom:0.75rem; cursor:pointer; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-md); padding:0.5rem 0.6rem; flex-wrap:wrap;">
+                <input type="checkbox" id="hasLunchClosureInput" style="width:auto; flex-shrink:0;">
+                <span style="font-weight:600; white-space:nowrap;">Fechamento para almoço</span>
                 <span style="font-size:0.72rem; color:var(--text-muted);">— 4 horários/dia quando ativo, 2 quando inativo</span>
               </label>
               <div id="scheduleContainer" style="display:flex; flex-direction:column; gap:0.5rem;"></div>
@@ -1076,6 +1076,6 @@
   </div>
 
   <!-- Scripts (Module) -->
-  <script type="module" src="js/admin-supabase.js?v=16"></script>
+  <script type="module" src="js/admin-supabase.js?v=17"></script>
 </body>
 </html>

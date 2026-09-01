@@ -8,13 +8,21 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const SUPABASE_URL = 'https://lgeeaolymwtauasppkla.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZWVhb2x5bXd0YXVhc3Bwa2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2NzQwMzcsImV4cCI6MjEwMzI1MDAzN30.RvHH6DELKFeDmM0GTemGX49u-xaBPejePm2QhXxtb6Y';
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true
-  }
-});
+// Singleton para evitar Multiple GoTrueClient no mesmo contexto (admin + storage imports com ?v diferente)
+let _supabaseInstance = null;
+if (typeof window !== 'undefined' && window._supabaseClient) {
+  _supabaseInstance = window._supabaseClient;
+} else {
+  _supabaseInstance = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  });
+  if (typeof window !== 'undefined') window._supabaseClient = _supabaseInstance;
+}
+export const supabase = _supabaseInstance;
 
 // Helper para preservar subpath do GitHub Pages (/cardapioonline)
 function getBaseUrlLib() {
