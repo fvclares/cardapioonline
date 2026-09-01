@@ -1552,6 +1552,7 @@ const tabTitles = {
   'tab-orders': 'Pedidos Recebidos',
   'tab-sizes': 'Tamanhos de Pizza',
   'tab-addons': 'Bordas & Extras',
+  'tab-neighborhoods': 'Bairros e Taxas',
   'tab-share': 'Link da Loja',
   'tab-invites': 'Gerenciar Convites',
   'tab-create-store': 'Criar Sua Loja'
@@ -1576,6 +1577,7 @@ navItems.forEach(item => {
     if (tabId === 'tab-orders') renderOrders();
     if (tabId === 'tab-sizes') renderPizzaSizes();
     if (tabId === 'tab-addons') renderAddons();
+    if (tabId === 'tab-neighborhoods') renderNeighborhoods();
     if (tabId === 'tab-share') updatePublicUrl(currentStore?.slug);
     if (tabId === 'tab-invites') renderInvites();
   });
@@ -2066,12 +2068,111 @@ async function renderProdSizePrices(productId){
   container.querySelectorAll('input[data-size-id]').forEach(inp=> attachCurrencyMask(inp));
 }
 
+// ============================================
+// BAIRROS / TAXAS (entrega por bairro)
+// Regra: 0 ou 1 bairro = taxa padrão; >1 = seletor no carrinho
+// ============================================
+async function renderNeighborhoods(){
+  const container = document.getElementById('neighborhoodsListContainer');
+  if (!container) return;
+  if (!currentStoreId) { container.innerHTML='<p style="color:var(--text-muted);">Crie sua loja primeiro.</p>'; return; }
+  const { data, error } = await neighborhoodsApi.list(currentStoreId);
+  if (error) { container.innerHTML=`<p style="color:var(--status-closed);">Erro: ${error.message}</p>`; return; }
+  // lista só ativos para regra, mas mostra todos com badge
+  const all = data || [];
+  if (!all.length) {
+    container.innerHTML=`
+      <div style="text-align:center; padding:2rem; border:1px dashed var(--border); border-radius:var(--radius-md); color:var(--text-muted);">
+        <div style="font-size:2rem;">📍</div>
+        <p style="font-weight:600; color:var(--text-secondary);">Nenhum bairro cadastrado</p>
+        <p style="font-size:0.85rem; margin-top:0.25rem;">Com 0 bairros o cliente paga a <strong>Taxa Padrão</strong> (R$ ${formatCurrencyInput(currentStore?.default_delivery_fee ?? 7)}).<br>Adicione <strong>2 ou mais</strong> para ativar o seletor por bairro no carrinho.</p>
+      </div>
+      <div style="margin-top:1rem; padding:0.75rem 1rem; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius-md); font-size:0.85rem;">
+        <strong style="color:var(--primary);">ℹ️ Como funciona:</strong> Taxa Padrão = ${formatCurrency(currentStore?.default_delivery_fee ?? 7)} (Configurações). Se cadastrar 2+ bairros, cada bairro usa sua taxa e o cliente escolhe no checkout.
+      </div>`;
+    return;
+  }
+  const activeCount = all.filter(n=> n.is_active!==false).length;
+  const hint = activeCount <=1
+    ? `<div style="margin-bottom:1rem; padding:0.65rem 0.85rem; background:rgba(255,184,0,0.12); border:1px solid rgba(255,184,0,0.35); border-radius:var(--radius-md); font-size:0.82rem;">⚠️ <strong>${activeCount} bairro ativo</strong> — o carrinho usará a <strong>Taxa Padrão (${formatCurrency(currentStore?.default_delivery_fee ?? 7)})</strong>. Adicione mais 1 bairro ativo para ativar o seletor.</div>`
+    : `<div style="margin-bottom:1rem; padding:0.65rem 0.85rem; background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.35); border-radius:var(--radius-md); font-size:0.82rem;">✅ <strong>${activeCount} bairros ativos</strong> — seletor visível no carrinho. Taxa varia por bairro; Taxa Padrão só como fallback.</div>`;
+  container.innerHTML = hint + all
+    .sort((a,b)=> (a.display_order||1)-(b.display_order||1) || a.name.localeCompare(b.name))
+    .map(n=>`
+    <div class="admin-card" style="padding:0.85rem 1rem; margin-bottom:0.6rem; display:flex; justify-content:space-between; align-items:center; ${n.is_active===false?'opacity:0.6; border-style:dashed;':''}">
+      <div>
+        <div style="font-weight:800; font-size:0.95rem;">📍 ${n.name} ${n.is_active===false ? '<span class="badge badge-closed" style="margin-left:0.4rem;">Inativo</span>' : ''}</div>
+        <div style="font-size:0.82rem; color:var(--text-secondary);">Taxa: <strong style="color:var(--primary);">${formatCurrency(n.fee)}</strong> • ordem ${n.display_order||1}</div>
+      </div>
+      <div style="display:flex; gap:0.4rem;">
+        <button class="btn btn-secondary btn-sm btn-edit-neighborhood" data-id="${n.id}">✏️</button>
+        <button class="btn btn-secondary btn-sm btn-del-neighborhood" data-id="${n.id}" style="color:var(--status-closed);">🗑️</button>
+      </div>
+    </div>
+  `).join('');
+  container.querySelectorAll('.btn-edit-neighborhood').forEach(b=> b.addEventListener('click', ()=> openNeighborhoodModal(b.dataset.id)));
+  container.querySelectorAll('.btn-del-neighborhood').forEach(b=> b.addEventListener('click', ()=> deleteNeighborhood(b.dataset.id)));
+}
+
+function openNeighborhoodModal(id=null){
+  const modal=document.getElementById('neighborhoodModalBackdrop');
+  const title=document.getElementById('neighborhoodModalTitle');
+  document.getElementById('neighborhoodEditId').value=id||'';
+  if(!id){
+    title.textContent='Novo Bairro';
+    document.getElementById('neighborhoodForm').reset();
+    document.getElementById('neighborhoodOrderInput').value='1';
+    document.getElementById('neighborhoodActiveInput').checked=true;
+    document.getElementById('neighborhoodFeeInput').value=formatCurrencyInput(0);
+  } else {
+    title.textContent='Editar Bairro';
+    neighborhoodsApi.list(currentStoreId).then(({data})=>{
+      const n=data?.find(x=>x.id===id); if(!n) return;
+      document.getElementById('neighborhoodNameInput').value=n.name||'';
+      document.getElementById('neighborhoodFeeInput').value=formatCurrencyInput(n.fee||0);
+      document.getElementById('neighborhoodOrderInput').value=n.display_order||1;
+      document.getElementById('neighborhoodActiveInput').checked=n.is_active!==false;
+    });
+  }
+  modal.classList.add('active');
+}
+function closeNeighborhoodModal(){ document.getElementById('neighborhoodModalBackdrop').classList.remove('active'); }
+async function deleteNeighborhood(id){
+  if(!confirm('Excluir este bairro? Clientes deste bairro voltarão a pagar a Taxa Padrão.')) return;
+  showLoading(true);
+  const {error}=await neighborhoodsApi.delete(id);
+  showLoading(false);
+  if(error) showToast(error.message,'error'); else { showToast('🗑️ Bairro removido','success'); renderNeighborhoods(); }
+}
+
+document.getElementById('btnNewNeighborhood')?.addEventListener('click', ()=> openNeighborhoodModal());
+document.getElementById('btnCloseNeighborhoodModal')?.addEventListener('click', closeNeighborhoodModal);
+document.getElementById('btnCancelNeighborhood')?.addEventListener('click', closeNeighborhoodModal);
+document.getElementById('neighborhoodForm')?.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const id=document.getElementById('neighborhoodEditId').value;
+  const payload={
+    name: document.getElementById('neighborhoodNameInput').value.trim(),
+    fee: parseCurrency(document.getElementById('neighborhoodFeeInput').value)||0,
+    display_order: Number(document.getElementById('neighborhoodOrderInput').value)||1,
+    is_active: document.getElementById('neighborhoodActiveInput').checked
+  };
+  if(!payload.name) return showToast('Informe o nome do bairro','error');
+  showLoading(true);
+  let error;
+  if(id){ const r=await neighborhoodsApi.update(id,payload); error=r.error; }
+  else { const r=await neighborhoodsApi.create(currentStoreId,payload); error=r.error; }
+  showLoading(false);
+  if(error) showToast(error.message,'error'); else { closeNeighborhoodModal(); showToast('✅ Bairro salvo!','success'); renderNeighborhoods(); }
+});
+
 // Máscara de moeda - setup inicial
 function setupCurrencyMasks(){
   attachCurrencyMask(document.getElementById('storeDeliveryFeeInput'));
   attachCurrencyMask(document.getElementById('storeMinOrderInput'));
   attachCurrencyMask(document.getElementById('prodPriceInput'));
   attachCurrencyMask(document.getElementById('addonOptionPriceInput'), true);
+  attachCurrencyMask(document.getElementById('neighborhoodFeeInput'));
 }
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {

@@ -108,6 +108,9 @@ class SupabaseStorageEngine {
       this._dataCache.settings = settingsResult.data || {};
       this._dataCache.pizzaSizes = pizzaSizesResult?.data || [];
       this._dataCache.productSizePrices = sizePricesResult?.data || [];
+      if (this._dataCache.store) {
+        this._dataCache.store.neighborhoods = this._dataCache.neighborhoods;
+      }
 
       console.log('✅ SupabaseStorageEngine inicializado para store:', storeId);
       this.emitChange('data_ready', this._dataCache);
@@ -161,7 +164,13 @@ class SupabaseStorageEngine {
     if (this.useLocalFallback) {
       return JSON.parse(this.getItem('cardapio_store_data') || '{}');
     }
-    if (this._dataCache.store) return this._dataCache.store;
+    if (this._dataCache.store) {
+      // mantém store.neighborhoods sincronizado com cache de bairros (necessário para regra >1 bairro)
+      if (this._dataCache.store.neighborhoods !== this._dataCache.neighborhoods) {
+        this._dataCache.store.neighborhoods = this._dataCache.neighborhoods || [];
+      }
+      return this._dataCache.store;
+    }
     return {};
   }
 
@@ -245,7 +254,12 @@ class SupabaseStorageEngine {
   }
 
   getNeighborhoods() {
-    if (this.useLocalFallback) return [];
+    if (this.useLocalFallback) {
+      try {
+        const s = JSON.parse(this.getItem('cardapio_store_data') || '{}');
+        return s.neighborhoods || [];
+      } catch { return []; }
+    }
     return this._dataCache.neighborhoods || [];
   }
 

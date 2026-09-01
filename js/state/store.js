@@ -83,6 +83,18 @@ class StoreState {
       } else {
         // Supabase: usa cache local se disponível, senão busca
         this._refreshFromStorage();
+        // garante neighborhoods sincronizado quando vem do Supabase
+        if (this.store && storageEngine.getNeighborhoods) {
+          const nbsSync = storageEngine.getNeighborhoods();
+          if (nbsSync) this.store.neighborhoods = nbsSync;
+        }
+      }
+      // Regra >1 bairro: se 0 ou 1, limpa seleção para usar taxa padrão
+      const nbsSync2 = this.store?.neighborhoods || (storageEngine.getNeighborhoods?.() || []);
+      if (nbsSync2.length > 1) {
+        if (!this.cart.neighborhood && nbsSync2[0]) this.cart.neighborhood = nbsSync2[0];
+      } else {
+        if (this.cart.neighborhood) this.cart.neighborhood = null;
       }
       this._ready = true;
       this.notify();
@@ -145,9 +157,16 @@ class StoreState {
       }
       this.customer = storageEngine.getCustomerProfile();
       
-      // Default neighborhood (apenas se loja cadastrou bairros; sem Padrão)
-      if (!this.cart.neighborhood && this.store && this.store.neighborhoods?.[0]) {
-        this.cart.neighborhood = this.store.neighborhoods[0];
+      // Default neighborhood: só auto-seleciona se >1 bairro cadastrado; caso contrário mantém taxa padrão (sem bairro)
+      const nbs = this.store?.neighborhoods || (window.storage?.getNeighborhoods?.() || []);
+      if (nbs.length > 1) {
+        if (!this.cart.neighborhood && nbs[0]) {
+          this.cart.neighborhood = nbs[0];
+        }
+      } else {
+        if (this.cart.neighborhood) {
+          this.cart.neighborhood = null;
+        }
       }
       
       this._ready = true;
@@ -176,6 +195,11 @@ class StoreState {
         storageEngine.getSettings ? storageEngine.getSettings() : {}
       ]);
       this.store = store || this.store;
+      // garante neighborhoods no store (Supabase: tabela separada)
+      if (storageEngine.getNeighborhoods) {
+        const nbs = storageEngine.getNeighborhoods();
+        if (this.store) this.store.neighborhoods = nbs || [];
+      }
       this.categories = categories || this.categories;
       this.products = products || this.products;
       this.addonGroups = addonGroups || this.addonGroups;
@@ -526,8 +550,10 @@ class StoreState {
 
   getDeliveryFee() {
     if (this.cart.orderType === 'pickup') return 0;
-    if (this.cart.neighborhood && typeof this.cart.neighborhood.fee === 'number') {
-      return this.cart.neighborhood.fee;
+    const nbs = this.store?.neighborhoods || (window.storage?.getNeighborhoods?.() || []);
+    // Regra: mostra seletor e cobra por bairro apenas se >1 bairro cadastrado; senão taxa padrão
+    if (nbs.length > 1 && this.cart.neighborhood && typeof this.cart.neighborhood.fee === 'number') {
+      return Number(this.cart.neighborhood.fee);
     }
     return Number(this.store?.default_delivery_fee || 0);
   }

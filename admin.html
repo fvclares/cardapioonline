@@ -157,6 +157,10 @@
           <span class="admin-nav-icon">🧀</span>
           <span>Bordas & Extras</span>
         </button>
+        <button class="admin-nav-item" data-tab="tab-neighborhoods">
+          <span class="admin-nav-icon">📍</span>
+          <span>Bairros / Taxas</span>
+        </button>
         <button class="admin-nav-item" data-tab="tab-share">
           <span class="admin-nav-icon">🔗</span>
           <span>Link da Loja</span>
@@ -433,6 +437,22 @@
               Crie grupos de personalização (ex: Tamanhos, Bordas, Adicionais) e suas opções com preço. Tamanhos aparecem só para pizzas.
             </p>
             <div id="addonsListContainer"></div>
+          </div>
+        </div>
+
+        <!-- TAB: Bairros / Taxas -->
+        <div class="tab-panel" id="tab-neighborhoods">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h2 class="admin-card-title">📍 Bairros e Taxas de Entrega</h2>
+              <button class="btn btn-primary btn-sm" id="btnNewNeighborhood">
+                + Novo Bairro
+              </button>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 1.25rem; font-size: 0.9rem;">
+              Cadastre os bairros que você atende e a taxa de cada um. Com <strong>0 ou 1 bairro</strong> o cliente paga a <strong>Taxa Padrão</strong> (Configurações). Com <strong>&gt;1 bairro</strong> o seletor <em>“Selecione seu Bairro para a Taxa de Entrega”</em> aparece no carrinho e cobra a taxa do bairro escolhido.
+            </p>
+            <div id="neighborhoodsListContainer"></div>
           </div>
         </div>
 
@@ -821,6 +841,42 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" id="btnCancelPizzaSize">Cancelar</button>
           <button type="submit" class="btn btn-primary">Salvar Tamanho</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Bairro / Taxa -->
+  <div id="neighborhoodModalBackdrop" class="modal-backdrop">
+    <div class="modal-sheet" style="max-width: 480px;">
+      <div class="modal-header">
+        <div class="modal-title" id="neighborhoodModalTitle">Novo Bairro</div>
+        <button class="modal-close-btn" id="btnCloseNeighborhoodModal">✕</button>
+      </div>
+      <form id="neighborhoodForm">
+        <div class="modal-body">
+          <input type="hidden" id="neighborhoodEditId" />
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label">Nome do Bairro *</label>
+            <input type="text" id="neighborhoodNameInput" placeholder="Ex: Centro, Jardins, Bela Vista" required />
+          </div>
+          <div class="form-grid form-grid-2" style="margin-bottom: 1rem;">
+            <div class="form-group">
+              <label class="form-label">Taxa (R$) *</label>
+              <input type="text" inputmode="decimal" placeholder="0,00" id="neighborhoodFeeInput" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Ordem</label>
+              <input type="number" id="neighborhoodOrderInput" value="1" min="1" />
+            </div>
+          </div>
+          <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; font-size:0.88rem;">
+            <input type="checkbox" id="neighborhoodActiveInput" checked style="width:auto;" /> Ativo (aparece para o cliente)
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btnCancelNeighborhood">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Bairro</button>
         </div>
       </form>
     </div>

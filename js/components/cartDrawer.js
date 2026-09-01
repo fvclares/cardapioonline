@@ -54,6 +54,8 @@ function setupCartDrawer(onProceedToCheckout) {
     const paymentMethod = window.appState.cart.paymentMethod;
     const cashChange = window.appState.cart.cashChange;
     const minOrder = Number(store.min_order_value || 0);
+    const neighborhoods = (store.neighborhoods && store.neighborhoods.length ? store.neighborhoods : (window.storage?.getNeighborhoods?.() || []));
+    const hasMultipleNeighborhoods = neighborhoods.length > 1;
 
     const isBelowMin = subtotal < minOrder;
     const fractionalCheck = window.appState.validateFractionalCart ? window.appState.validateFractionalCart() : { valid:true, errors:[] };
@@ -137,11 +139,11 @@ function setupCartDrawer(onProceedToCheckout) {
           `).join('')}
         </div>
 
-        ${orderType === 'delivery' ? `
+        ${orderType === 'delivery' && hasMultipleNeighborhoods ? `
           <div class="form-group" style="margin-bottom: 1.25rem;">
             <label class="form-label">📍 Selecione seu Bairro para a Taxa de Entrega:</label>
             <select id="cartNeighborhoodSelect">
-              ${(store.neighborhoods || []).map(n => `
+              ${neighborhoods.map(n => `
                 <option value="${n.name}" ${window.appState.cart.neighborhood?.name === n.name ? 'selected' : ''}>
                   ${n.name} — ${cs ? cs.formatCurrency(n.fee) : 'R$ ' + n.fee}
                 </option>
@@ -184,7 +186,7 @@ function setupCartDrawer(onProceedToCheckout) {
           </div>
           ${orderType === 'delivery' ? `
             <div class="order-total-row">
-              <span>Taxa de Entrega${window.appState.cart.neighborhood?.name ? ` (${window.appState.cart.neighborhood.name})` : ''}:</span>
+              <span>Taxa de Entrega${hasMultipleNeighborhoods && window.appState.cart.neighborhood?.name ? ` (${window.appState.cart.neighborhood.name})` : ''}:</span>
               <span>${cs ? cs.formatCurrency(deliveryFee) : 'R$ ' + deliveryFee}</span>
             </div>
           ` : `
@@ -248,11 +250,12 @@ function setupCartDrawer(onProceedToCheckout) {
       });
     });
 
-    // Bairro
+    // Bairro (apenas quando >1 bairro cadastrado)
     const selectNeighborhood = cartDrawerContent.querySelector('#cartNeighborhoodSelect');
     if (selectNeighborhood) {
       selectNeighborhood.addEventListener('change', (e) => {
-        const found = window.appState.store.neighborhoods?.find(n => n.name === e.target.value);
+        const nbs = window.appState.store.neighborhoods?.length ? window.appState.store.neighborhoods : (window.storage?.getNeighborhoods?.() || []);
+        const found = nbs.find(n => n.name === e.target.value);
         if (found) {
           window.appState.setNeighborhood(found);
           renderCartContent();
