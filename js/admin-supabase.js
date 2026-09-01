@@ -4,7 +4,7 @@
  * Sistema de Convites (invite-only)
  */
 
-import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi, pizzaSizesApi, productSizePricesApi, subscriptionsApi, paymentsApi, offersApi, offerGroupsApi, offerGroupItemsApi, offerSchedulesApi } from './lib/supabase.js?v=16';
+import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi, pizzaSizesApi, productSizePricesApi, subscriptionsApi, paymentsApi, offersApi, offerGroupsApi, offerGroupItemsApi, offerSchedulesApi, campaignsApi } from './lib/supabase.js?v=16';
 import storage from './state/storage-supabase.js?v=16';
 
 // Expose para compatibilidade global
@@ -22,6 +22,7 @@ window.offersApi = offersApi;
 window.offerGroupsApi = offerGroupsApi;
 window.offerGroupItemsApi = offerGroupItemsApi;
 window.offerSchedulesApi = offerSchedulesApi;
+window.campaignsApi = campaignsApi;
 window.ordersApi = ordersApi;
 window.settingsApi = settingsApi;
 window.storageApi = storageApi;
@@ -1561,6 +1562,7 @@ const tabTitles = {
   'tab-addons': 'Bordas & Extras',
   'tab-neighborhoods': 'Bairros e Taxas',
   'tab-offers': 'Promoções e Combos',
+  'tab-campaigns': 'Campanhas',
   'tab-share': 'Link da Loja',
   'tab-invites': 'Gerenciar Convites',
   'tab-create-store': 'Criar Sua Loja'
@@ -1587,6 +1589,7 @@ navItems.forEach(item => {
     if (tabId === 'tab-addons') renderAddons();
     if (tabId === 'tab-neighborhoods') renderNeighborhoods();
     if (tabId === 'tab-offers') renderOffers();
+    if (tabId === 'tab-campaigns') renderCampaigns();
     if (tabId === 'tab-share') updatePublicUrl(currentStore?.slug);
     if (tabId === 'tab-invites') renderInvites();
   });
@@ -2443,6 +2446,122 @@ document.getElementById('offerGroupForm')?.addEventListener('submit', async (e)=
   }
   showLoading(false);
   if(error) showToast(error.message,'error'); else { closeOfferGroupModal(); showToast('✅ Grupo salvo!','success'); renderOffers(); }
+});
+
+// ============================================
+// CAMPANHAS
+// ============================================
+async function renderCampaigns(){
+  const container=document.getElementById('campaignsListContainer');
+  if(!container) return;
+  if(!currentStoreId){ container.innerHTML='<p style="color:var(--text-muted);">Crie sua loja primeiro.</p>'; return; }
+  const { data, error } = await campaignsApi.list(currentStoreId);
+  if(error){ container.innerHTML=`<p style="color:var(--status-closed);">${error.message}</p>`; return; }
+  if(!data?.length){
+    container.innerHTML=`
+      <div style="text-align:center; padding:2rem; border:1px dashed var(--border); border-radius:var(--radius-md); color:var(--text-muted);">
+        <div style="font-size:2rem;">📅</div>
+        <p style="font-weight:600; color:var(--text-secondary);">Nenhuma campanha</p>
+        <p style="font-size:0.85rem; margin-top:0.25rem;">Ex: <strong>Semana do Cliente 01/09→07/09</strong> agrupando 3 ofertas.</p>
+      </div>`;
+    return;
+  }
+  container.innerHTML = await Promise.all(data.sort((a,b)=>a.display_order-b.display_order).map(async c=>{
+    const { data: withOffers } = await campaignsApi.getWithOffers(c.id).catch(()=>({data:{offers:[]}}));
+    const offers = withOffers?.offers || [];
+    const isActiveRange = (()=>{ const today=new Date().toISOString().slice(0,10); return c.active && c.start_date<=today && c.end_date>=today; })();
+    return `
+      <div class="admin-card" style="padding:1rem; margin-bottom:0.75rem; border:1px solid ${isActiveRange?'var(--status-open)':'var(--border)'}; ${!c.active?'opacity:0.6;':''}">
+        <div style="display:flex; justify-content:space-between; gap:1rem;">
+          <div>
+            <div style="font-weight:800;">${c.name} ${isActiveRange?'<span class="badge badge-open">ativa</span>':''} ${!c.active?'<span class="badge badge-closed">inativa</span>':''}</div>
+            <div style="font-size:0.78rem; color:var(--text-muted);">${c.description||''}</div>
+            <div style="font-size:0.78rem; margin-top:0.2rem;">📅 ${new Date(c.start_date+'T12:00:00').toLocaleDateString('pt-BR')} → ${new Date(c.end_date+'T12:00:00').toLocaleDateString('pt-BR')} • ${offers.length} ofertas: ${offers.map(o=>o.name).join(', ')||'nenhuma'}</div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:0.3rem;">
+            <button class="btn btn-secondary btn-sm btn-edit-campaign" data-id="${c.id}">✏️</button>
+            <button class="btn btn-secondary btn-sm btn-del-campaign" data-id="${c.id}" style="color:var(--status-closed);">🗑️</button>
+          </div>
+        </div>
+      </div>`;
+  })).then(arr=>arr.join(''));
+  container.querySelectorAll('.btn-edit-campaign').forEach(b=> b.addEventListener('click', ()=> openCampaignModal(b.dataset.id)));
+  container.querySelectorAll('.btn-del-campaign').forEach(b=> b.addEventListener('click', ()=> deleteCampaign(b.dataset.id)));
+}
+async function openCampaignModal(id=null){
+  const modal=document.getElementById('campaignModalBackdrop');
+  const title=document.getElementById('campaignModalTitle');
+  document.getElementById('campaignEditId').value=id||'';
+  // load offers for checklist
+  const { data: offers } = await offersApi.listAll(currentStoreId).catch(()=>({data:[]}));
+  const list=document.getElementById('campaignOffersList');
+  const renderOffersCheck = (selectedIds=[])=>{
+    if(!offers?.length){ list.innerHTML='<p style="font-size:0.8rem; color:var(--text-muted);">Crie ofertas primeiro em Promoções e Combos.</p>'; return; }
+    list.innerHTML = offers.map(o=>`
+      <label style="display:flex; align-items:center; gap:0.5rem; padding:0.3rem; border-bottom:1px solid var(--border-light);">
+        <input type="checkbox" value="${o.id}" ${selectedIds.includes(String(o.id))?'checked':''} style="width:auto;" />
+        <span style="flex:1; font-size:0.85rem;">${o.name} <span style="color:var(--primary); font-weight:700; font-size:0.75rem;">${formatCurrency(o.price)}</span></span>
+      </label>
+    `).join('');
+  };
+  if(!id){
+    title.textContent='Nova Campanha';
+    document.getElementById('campaignForm').reset();
+    document.getElementById('campaignOrderInput').value='1';
+    document.getElementById('campaignActiveInput').checked=true;
+    const today=new Date().toISOString().slice(0,10);
+    const next=new Date(Date.now()+7*24*3600*1000).toISOString().slice(0,10);
+    document.getElementById('campaignStartInput').value=today;
+    document.getElementById('campaignEndInput').value=next;
+    renderOffersCheck([]);
+  } else {
+    title.textContent='Editar Campanha';
+    const { data } = await campaignsApi.getWithOffers(id);
+    if(!data) return;
+    document.getElementById('campaignNameInput').value=data.name||'';
+    document.getElementById('campaignDescriptionInput').value=data.description||'';
+    document.getElementById('campaignStartInput').value=data.start_date||'';
+    document.getElementById('campaignEndInput').value=data.end_date||'';
+    document.getElementById('campaignOrderInput').value=data.display_order||1;
+    document.getElementById('campaignActiveInput').checked=!!data.active;
+    const selIds=(data.offers||[]).map(o=>String(o.id));
+    renderOffersCheck(selIds);
+  }
+  modal.classList.add('active');
+}
+function closeCampaignModal(){ document.getElementById('campaignModalBackdrop').classList.remove('active'); }
+async function deleteCampaign(id){
+  if(!confirm('Excluir campanha? Ofertas permanecem.')) return;
+  showLoading(true);
+  const {error}=await campaignsApi.delete(id);
+  showLoading(false);
+  if(error) showToast(error.message,'error'); else { showToast('🗑️ Campanha removida','success'); renderCampaigns(); }
+}
+document.getElementById('btnNewCampaign')?.addEventListener('click', ()=> openCampaignModal());
+document.getElementById('btnCloseCampaignModal')?.addEventListener('click', closeCampaignModal);
+document.getElementById('btnCancelCampaign')?.addEventListener('click', closeCampaignModal);
+document.getElementById('campaignForm')?.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const id=document.getElementById('campaignEditId').value;
+  const offer_ids=Array.from(document.querySelectorAll('#campaignOffersList input:checked')).map(cb=> cb.value);
+  const payload={
+    name: document.getElementById('campaignNameInput').value.trim(),
+    description: document.getElementById('campaignDescriptionInput').value.trim()||null,
+    start_date: document.getElementById('campaignStartInput').value,
+    end_date: document.getElementById('campaignEndInput').value,
+    display_order: Number(document.getElementById('campaignOrderInput').value)||1,
+    active: document.getElementById('campaignActiveInput').checked,
+    offer_ids
+  };
+  if(!payload.name) return showToast('Nome obrigatório','error');
+  if(!payload.start_date || !payload.end_date) return showToast('Período obrigatório','error');
+  if(payload.end_date < payload.start_date) return showToast('Fim antes do início','error');
+  showLoading(true);
+  let error;
+  if(id){ const r=await campaignsApi.update(id, payload); error=r.error; }
+  else { const r=await campaignsApi.create(currentStoreId, payload); error=r.error; }
+  showLoading(false);
+  if(error) showToast(error.message,'error'); else { closeCampaignModal(); showToast('✅ Campanha salva!','success'); renderCampaigns(); }
 });
 
 // Máscara de moeda - setup inicial

@@ -785,4 +785,60 @@ export const offerSchedulesApi = {
   async delete(id){ const { error } = await supabase.from('offer_schedules').delete().eq('id', id); return { error }; }
 };
 
+// ============================================
+// CAMPAIGNS API - Agrupa ofertas em período
+// ============================================
+export const campaignsApi = {
+  async list(storeId){
+    const { data, error } = await supabase.from('campaigns').select('*').eq('store_id', storeId).order('display_order');
+    return { data, error };
+  },
+  async listActive(storeId, now=new Date()){
+    const today = now.toISOString().slice(0,10);
+    const { data, error } = await supabase.from('campaigns').select('*').eq('store_id', storeId).eq('active', true).lte('start_date', today).gte('end_date', today).order('display_order');
+    return { data, error };
+  },
+  async getWithOffers(campaignId){
+    const { data: camp, error: cErr } = await supabase.from('campaigns').select('*').eq('id', campaignId).single();
+    if(cErr) return { data:null, error:cErr };
+    const { data: links } = await supabase.from('campaign_offers').select('offer_id').eq('campaign_id', campaignId);
+    const offerIds = (links||[]).map(r=>r.offer_id);
+    let offers=[];
+    if(offerIds.length){
+      const { data: offs } = await supabase.from('offers').select('*').in('id', offerIds);
+      offers = offs||[];
+    }
+    return { data: { ...camp, offers }, error: null };
+  },
+  async create(storeId, payload){
+    const { offer_ids, ...campData } = payload;
+    const { data: camp, error } = await supabase.from('campaigns').insert([{ ...campData, store_id: storeId }]).select().single();
+    if(error) return { data:null, error };
+    if(offer_ids?.length){
+      const rows = offer_ids.map(oid=>({ campaign_id: camp.id, offer_id: oid }));
+      const { error: lErr } = await supabase.from('campaign_offers').insert(rows);
+      if(lErr) return { data:null, error:lErr };
+    }
+    return { data: camp, error: null };
+  },
+  async update(id, updates){
+    const { offer_ids, ...campData } = updates;
+    const { data, error } = await supabase.from('campaigns').update(campData).eq('id', id).select().single();
+    if(error) return { data:null, error };
+    if(offer_ids !== undefined){
+      await supabase.from('campaign_offers').delete().eq('campaign_id', id);
+      if(offer_ids.length){
+        const rows = offer_ids.map(oid=>({ campaign_id: id, offer_id: oid }));
+        const { error: lErr } = await supabase.from('campaign_offers').insert(rows);
+        if(lErr) return { data:null, error:lErr };
+      }
+    }
+    return { data, error: null };
+  },
+  async delete(id){
+    const { error } = await supabase.from('campaigns').delete().eq('id', id);
+    return { error };
+  }
+};
+
 export default supabase;

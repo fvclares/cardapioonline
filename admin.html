@@ -165,6 +165,10 @@
           <span class="admin-nav-icon">🎁</span>
           <span>Promoções e Combos</span>
         </button>
+        <button class="admin-nav-item" data-tab="tab-campaigns">
+          <span class="admin-nav-icon">📅</span>
+          <span>Campanhas</span>
+        </button>
         <button class="admin-nav-item" data-tab="tab-share">
           <span class="admin-nav-icon">🔗</span>
           <span>Link da Loja</span>
@@ -473,6 +477,22 @@
               Crie ofertas por regras: defina preço fechado e grupos de seleção (ex: 4 salgadas + 1 doce). Suporta <strong>extra por item</strong> e <strong>janela temporal</strong> (dia/horário). Vazio em validade = sempre ativo.
             </p>
             <div id="offersListContainer"></div>
+          </div>
+        </div>
+
+        <!-- TAB: Campanhas -->
+        <div class="tab-panel" id="tab-campaigns">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h2 class="admin-card-title">📅 Campanhas</h2>
+              <button class="btn btn-primary btn-sm" id="btnNewCampaign">
+                + Nova Campanha
+              </button>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 1.25rem; font-size: 0.9rem;">
+              Agrupe ofertas em um período (ex: <strong>Semana do Cliente 01/09→07/09</strong>). Reutiliza ofertas sem duplicar — a campanha só organiza a vitrine.
+            </p>
+            <div id="campaignsListContainer"></div>
           </div>
         </div>
 
@@ -985,6 +1005,57 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" id="btnCancelOfferGroup">Cancelar</button>
           <button type="submit" class="btn btn-primary">Salvar Grupo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Campanha -->
+  <div id="campaignModalBackdrop" class="modal-backdrop">
+    <div class="modal-sheet" style="max-width: 560px;">
+      <div class="modal-header">
+        <div class="modal-title" id="campaignModalTitle">Nova Campanha</div>
+        <button class="modal-close-btn" id="btnCloseCampaignModal">✕</button>
+      </div>
+      <form id="campaignForm">
+        <div class="modal-body">
+          <input type="hidden" id="campaignEditId" />
+          <div class="form-group" style="margin-bottom:1rem;">
+            <label class="form-label">Nome *</label>
+            <input type="text" id="campaignNameInput" placeholder="Ex: Semana do Cliente" required />
+          </div>
+          <div class="form-group" style="margin-bottom:1rem;">
+            <label class="form-label">Descrição</label>
+            <textarea id="campaignDescriptionInput" rows="2" placeholder="Ex: Ofertas válidas de 01/09 a 07/09"></textarea>
+          </div>
+          <div class="form-grid form-grid-2" style="margin-bottom:1rem;">
+            <div class="form-group">
+              <label class="form-label">Início *</label>
+              <input type="date" id="campaignStartInput" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Fim *</label>
+              <input type="date" id="campaignEndInput" required />
+            </div>
+          </div>
+          <div class="form-grid form-grid-2" style="margin-bottom:1rem;">
+            <div class="form-group">
+              <label class="form-label">Ordem</label>
+              <input type="number" id="campaignOrderInput" value="1" min="1" />
+            </div>
+            <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; padding-top:1.4rem;">
+              <input type="checkbox" id="campaignActiveInput" checked style="width:auto;" /> Ativa
+            </label>
+          </div>
+          <div style="border:1px solid var(--border); border-radius:var(--radius-md); padding:0.65rem; max-height:220px; overflow:auto;">
+            <div class="form-label" style="margin-bottom:0.4rem;">Ofertas nesta campanha</div>
+            <div id="campaignOffersList" style="display:flex; flex-direction:column; gap:0.3rem;"></div>
+            <div class="form-help">Selecione as ofertas que compõem a campanha. Vazio = campanha vazia.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btnCancelCampaign">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Campanha</button>
         </div>
       </form>
     </div>

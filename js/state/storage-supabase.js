@@ -4,7 +4,7 @@
  * Compatível com a API anterior (window.storage)
  */
 
-import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, neighborhoodsApi, ordersApi, settingsApi, pizzaSizesApi, productSizePricesApi, offersApi, offerGroupsApi, offerGroupItemsApi, offerSchedulesApi } from '../lib/supabase.js';
+import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, neighborhoodsApi, ordersApi, settingsApi, pizzaSizesApi, productSizePricesApi, offersApi, offerGroupsApi, offerGroupItemsApi, offerSchedulesApi, campaignsApi } from '../lib/supabase.js';
 
 // Normaliza campos Supabase -> formato legado do frontend
 function normalizeProduct(p) {
@@ -41,7 +41,8 @@ class SupabaseStorageEngine {
       settings: null,
       pizzaSizes: null,
       productSizePrices: null,
-      offers: null
+      offers: null,
+      campaigns: null
     };
   }
 
@@ -54,7 +55,7 @@ class SupabaseStorageEngine {
     }
     
     try {
-      const [storeResult, categoriesResult, productsResult, addonsResult, neighborhoodsResult, settingsResult, pizzaSizesResult, sizePricesResult, offersResult] = await Promise.all([
+      const [storeResult, categoriesResult, productsResult, addonsResult, neighborhoodsResult, settingsResult, pizzaSizesResult, sizePricesResult, offersResult, campaignsResult] = await Promise.all([
         storeApi.getById(storeId),
         categoriesApi.list(storeId),
         productsApi.listAdmin(storeId),
@@ -64,6 +65,7 @@ class SupabaseStorageEngine {
         pizzaSizesApi.listAll(storeId).catch(()=>({data:[]})),
         productSizePricesApi.listByStore(storeId).catch(()=>({data:[]})),
         this.fetchOffers(storeId).catch(()=>({data:[]})),
+        this.fetchCampaigns(storeId).catch(()=>({data:[]})),
       ]);
 
       if (storeResult.error) throw storeResult.error;
@@ -111,6 +113,7 @@ class SupabaseStorageEngine {
       this._dataCache.pizzaSizes = pizzaSizesResult?.data || [];
       this._dataCache.productSizePrices = sizePricesResult?.data || [];
       this._dataCache.offers = offersResult?.data || [];
+      this._dataCache.campaigns = campaignsResult?.data || [];
       if (this._dataCache.store) {
         this._dataCache.store.neighborhoods = this._dataCache.neighborhoods;
       }
@@ -318,6 +321,28 @@ class SupabaseStorageEngine {
         return cur>=start && cur<=end;
       });
     });
+  }
+  async fetchCampaigns(storeId){
+    const sid = storeId || this.storeId;
+    if(!sid) return { data: [] };
+    const { data: camps } = await campaignsApi.list(sid).catch(()=>({data:[]}));
+    const enriched=[];
+    for(const c of (camps||[])){
+      const { data: withOffers } = await campaignsApi.getWithOffers(c.id).catch(()=>({data:{offers:[]}}));
+      // getWithOffers returns camp with offers array; but we already have c, need offers list
+      const offers = withOffers?.offers || [];
+      enriched.push({ ...c, offers });
+    }
+    return { data: enriched };
+  }
+  getCampaigns(){
+    if(this.useLocalFallback) return [];
+    return this._dataCache.campaigns || [];
+  }
+  getActiveCampaigns(now=new Date()){
+    const all=this.getCampaigns();
+    const today=now.toISOString().slice(0,10);
+    return all.filter(c=> c.active && c.start_date<=today && c.end_date>=today);
   }
 
   // --- Customer (sempre local, por dispositivo) ---
