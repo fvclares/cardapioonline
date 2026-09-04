@@ -97,7 +97,7 @@ const whatsappService = {
     }
     lines.push(`*TOTAL A PAGAR: ${cs ? cs.formatCurrency(order.total) : 'R$ ' + order.total}*`);
     lines.push(`────────────────────────`);
-    lines.push(`_Pedido gerado via Cardápio Online_`);
+    lines.push(`_Pedido gerado via ZapMenu_`);
 
     return lines.join('\n');
   },

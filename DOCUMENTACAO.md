@@ -167,7 +167,7 @@ Subtotal: R$ 76,00
 Taxa de Entrega: R$ 7,00
 *TOTAL A PAGAR: R$ 83,00*
 ────────────────────────
-_Pedido gerado via Cardápio Online_
+_Pedido gerado via ZapMenu_
 ```
 
 - Gera a URL codificada `https://wa.me/5511999998888?text=...` e dispara a abertura direta no app do WhatsApp.
