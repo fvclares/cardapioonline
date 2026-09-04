@@ -4,8 +4,8 @@
  * Sistema de Convites (invite-only)
  */
 
-import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi, pizzaSizesApi, productSizePricesApi, subscriptionsApi, paymentsApi, offersApi, offerGroupsApi, offerGroupItemsApi, offerSchedulesApi, campaignsApi } from './lib/supabase.js?v=18';
-import storage from './state/storage-supabase.js?v=18';
+import { supabase, auth, storeApi, categoriesApi, productsApi, addonGroupsApi, addonOptionsApi, neighborhoodsApi, ordersApi, settingsApi, storageApi, invitesApi, profilesApi, pizzaSizesApi, productSizePricesApi, subscriptionsApi, paymentsApi, offersApi, offerGroupsApi, offerGroupItemsApi, offerSchedulesApi, campaignsApi } from './lib/supabase.js?v=19';
+import storage from './state/storage-supabase.js?v=19';
 
 // Expose para compatibilidade global
 window.supabase = supabase;
@@ -427,17 +427,33 @@ async function initAuth() {
   const inviteToken = urlParams.get('invite');
 
   if (inviteToken) {
-    await setupInviteSignup(inviteToken);
+    try {
+      await setupInviteSignup(inviteToken);
+    } catch(e){ console.warn('setupInviteSignup falhou', e); }
     authGate.classList.add('active');
+    showLoading(false);
     return;
   }
 
-  // Verifica sessão existente
-  const session = await auth.getSession();
+  // Verifica sessão existente — com timeout e fallback para não-logado (corrige tela preta mobile)
+  let session = null;
+  try {
+    // timeout de 4s para evitar Promise pendente em WebView / rede lenta
+    session = await Promise.race([
+      auth.getSession(),
+      new Promise((_, reject) => setTimeout(()=> reject(new Error('getSession timeout')), 4000))
+    ]);
+  } catch(e){
+    console.warn('getSession falhou/timeout', e?.message||e);
+    session = null;
+  }
   if (session?.user) {
     await onAuthSuccess(session.user);
     return;
   }
+  // NÃO logado e SEM invite → mostra gate de login (ESSENCIAL para mobile primeira visita)
+  authGate.classList.add('active');
+  showLoading(false);
 }
 
 async function setupInviteSignup(token) {
@@ -2760,8 +2776,47 @@ function setupCurrencyMasks(){
   attachCurrencyMask(document.getElementById('neighborhoodFeeInput'));
   attachCurrencyMask(document.getElementById('offerPriceInput'));
 }
-// Inicialização
+// Inicialização — com safety-net anti tela preta (mobile/GitHub Pages)
 document.addEventListener('DOMContentLoaded', () => {
   setupCurrencyMasks();
-  initAuth();
+  // Fallback global: se após 5s nenhum gate/layout visível, força authGate (cobre timeout de getSession, esm.sh lento, exceção silenciosa)
+  const safetyTimer = setTimeout(()=>{
+    const gate = document.getElementById('authGate');
+    const layout = document.getElementById('adminLayout');
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.classList.remove('active');
+    if (gate && layout && !gate.classList.contains('active') && !layout.classList.contains('authenticated')){
+      console.warn('Safety-net: forçando authGate visível após timeout');
+      gate.classList.add('active');
+    }
+  }, 5000);
+  // Captura erros não tratados de módulo (supabase import falho etc.)
+  window.addEventListener('error', ()=>{
+    clearTimeout(safetyTimer);
+    const gate = document.getElementById('authGate');
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.classList.remove('active');
+    if (gate && !gate.classList.contains('active')){
+      gate.classList.add('active');
+      const hint = document.getElementById('authSubtitle');
+      if (hint) hint.textContent = 'Erro ao carregar. Verifique conexão e recarregue. Se persistir, limpe cache do navegador.';
+    }
+  });
+  window.addEventListener('unhandledrejection', (ev)=>{
+    console.warn('unhandledrejection admin', ev.reason);
+    // não força gate aqui para não interferir em fluxos logados, mas garante overlay off
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.classList.remove('active');
+  });
+  initAuth().catch(err=>{
+    console.error('initAuth falhou', err);
+    clearTimeout(safetyTimer);
+    const gate = document.getElementById('authGate');
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.classList.remove('active');
+    if (gate) gate.classList.add('active');
+  }).finally(()=>{
+    // safetyTimer será limpo naturalmente quando initAuth succeeds e mostra gate/layout,
+    // mas mantém até 5s para cobrir pendência de getSession
+  });
 });
