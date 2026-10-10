@@ -148,25 +148,25 @@ pizza('Pizzas Tradicionais', 'Margarita', 'Molho, mussarela, manjericão, tomate
 pizza('Pizzas Tradicionais', 'Vegetariana', 'Molho, mussarela, manjericão, tomate, pimentão, palmito, milho, ervilha e orégano.', 35, 35, 40);
 
 // Especiais G45 GG50 (inteira)
-pizza('Pizzas Especiais', 'Calabacon', 'Molho, mussarela, calabresa, bacon, cebola e orégano.', 45, 45, 50);
-pizza('Pizzas Especiais', 'Calapalmito', 'Molho, mussarela, calabresa, palmito, cebola e orégano.', 45, 45, 50);
-pizza('Pizzas Especiais', 'Calabresa c/ Creme Cheese', 'Molho, mussarela, calabresa, creme cheese, cebola e orégano.', 45, 45, 50);
-pizza('Pizzas Especiais', 'Bacon c/ Palmito', 'Molho, mussarela, bacon, palmito, cebola e orégano.', 45, 45, 50);
-pizza('Pizzas Especiais', 'Bacon c/ Presunto', 'Molho, mussarela, bacon, presunto, cebola e orégano.', 45, 45, 50);
-pizza('Pizzas Especiais', 'Bacon c/ Creme Cheese', 'Molho, mussarela, bacon, creme cheese, cebola e orégano.', 45, 45, 50);
-pizza('Pizzas Especiais', 'Franbacon', 'Molho, mussarela, frango, bacon, cebola e orégano.', 45, 45, 50);
-pizza('Pizzas Especiais', 'Bacon c/ Ovos', 'Molho, mussarela, bacon, ovos, cebola e orégano.', 45, 45, 50);
-pizza('Pizzas Especiais', 'Bacon c/ Catupiry', 'Molho, mussarela, bacon, catupiry, cebola e orégano.', 45, 45, 50);
-pizza('Pizzas Especiais', 'Lombinho', 'Molho, mussarela, lombinho, milho, ervilha e orégano.', 45, 45, 50);
-pizza('Pizzas Especiais', 'Lombinho c/ Catupiry', 'Molho, mussarela, lombinho, catupiry, milho, ervilha e orégano.', 45, 45, 50);
-pizza('Pizzas Especiais', 'Frango c/ Creme Cheese', 'Molho, mussarela, frango, creme cheese, cebola e orégano.', 45, 45, 50);
-pizza('Pizzas Especiais', 'Moda do Pizzaiolo', 'Molho, mussarela, lombinho, bacon, catupiry, cebola e orégano.', 45, 45, 50);
-pizza('Pizzas Especiais', 'Moda do Gordo', 'Molho, mussarela, lombinho, calabresa, bacon, cheddar e orégano.', 45, 45, 50);
-pizza('Pizzas Especiais', 'Quatro Queijos c/ Bacon', 'Molho, mussarela, catupiry, parmesão, cheddar, bacon e orégano.', 45, 45, 50);
-pizza('Pizzas Especiais', 'Cinco Queijos c/ Creme Cheese', 'Molho, mussarela, catupiry, parmesão, cheddar e creme cheese.', 45, 45, 50);
-pizza('Pizzas Especiais', 'Maravilhosa', 'Molho, mussarela, peito de peru, manjericão e orégano.', 45, 45, 50);
-pizza('Pizzas Especiais', 'Peito de Peru', 'Molho, mussarela, peito de peru, milho, ervilha e orégano.', 45, 45, 50);
-pizza('Pizzas Especiais', 'Mexicana', 'Molho, mussarela, calabresa, pimenta calabresa, cebola e orégano.', 45, 45, 50);
+pizza('Pizzas Especiais', 'Calabacon', 'Molho, mussarela, calabresa, bacon, cebola e orégano.', 45, 45, 50, 40, 45);
+pizza('Pizzas Especiais', 'Calapalmito', 'Molho, mussarela, calabresa, palmito, cebola e orégano.', 45, 45, 50, 40, 45);
+pizza('Pizzas Especiais', 'Calabresa c/ Creme Cheese', 'Molho, mussarela, calabresa, creme cheese, cebola e orégano.', 45, 45, 50, 40, 45);
+pizza('Pizzas Especiais', 'Bacon c/ Palmito', 'Molho, mussarela, bacon, palmito, cebola e orégano.', 45, 45, 50, 40, 45);
+pizza('Pizzas Especiais', 'Bacon c/ Presunto', 'Molho, mussarela, bacon, presunto, cebola e orégano.', 45, 45, 50, 40, 45);
+pizza('Pizzas Especiais', 'Bacon c/ Creme Cheese', 'Molho, mussarela, bacon, creme cheese, cebola e orégano.', 45, 45, 50, 40, 45);
+pizza('Pizzas Especiais', 'Franbacon', 'Molho, mussarela, frango, bacon, cebola e orégano.', 45, 45, 50, 40, 45);
+pizza('Pizzas Especiais', 'Bacon c/ Ovos', 'Molho, mussarela, bacon, ovos, cebola e orégano.', 45, 45, 50, 40, 45);
+pizza('Pizzas Especiais', 'Bacon c/ Catupiry', 'Molho, mussarela, bacon, catupiry, cebola e orégano.', 45, 45, 50, 40, 45);
+pizza('Pizzas Especiais', 'Lombinho', 'Molho, mussarela, lombinho, milho, ervilha e orégano.', 45, 45, 50, 40, 45);
+pizza('Pizzas Especiais', 'Lombinho c/ Catupiry', 'Molho, mussarela, lombinho, catupiry, milho, ervilha e orégano.', 45, 45, 50, 40, 45);
+pizza('Pizzas Especiais', 'Frango c/ Creme Cheese', 'Molho, mussarela, frango, creme cheese, cebola e orégano.', 45, 45, 50, 40, 45);
+pizza('Pizzas Especiais', 'Moda do Pizzaiolo', 'Molho, mussarela, lombinho, bacon, catupiry, cebola e orégano.', 45, 45, 50, 40, 45);
+pizza('Pizzas Especiais', 'Moda do Gordo', 'Molho, mussarela, lombinho, calabresa, bacon, cheddar e orégano.', 45, 45, 50, 40, 45);
+pizza('Pizzas Especiais', 'Quatro Queijos c/ Bacon', 'Molho, mussarela, catupiry, parmesão, cheddar, bacon e orégano.', 45, 45, 50, 40, 45);
+pizza('Pizzas Especiais', 'Cinco Queijos c/ Creme Cheese', 'Molho, mussarela, catupiry, parmesão, cheddar e creme cheese.', 45, 45, 50, 40, 45);
+pizza('Pizzas Especiais', 'Maravilhosa', 'Molho, mussarela, peito de peru, manjericão e orégano.', 45, 45, 50, 40, 45);
+pizza('Pizzas Especiais', 'Peito de Peru', 'Molho, mussarela, peito de peru, milho, ervilha e orégano.', 45, 45, 50, 40, 45);
+pizza('Pizzas Especiais', 'Mexicana', 'Molho, mussarela, calabresa, pimenta calabresa, cebola e orégano.', 45, 45, 50, 40, 45);
 
 // Primes — grupo 1: G65 GG70 (meia fixa G50 / GG55)
 pizza('Pizzas Primes', 'Charque', 'Molho, mussarela, charque, cebola e orégano.', 65, 65, 70, 50, 55);
