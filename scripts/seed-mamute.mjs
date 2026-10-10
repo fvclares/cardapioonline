@@ -110,8 +110,10 @@ const { error: linkErr } = await db.from('addon_group_categories').insert([{
 if (linkErr) { console.error('Falha vínculo molhos->Entradas:', linkErr.message); process.exit(1); }
 
 // Produtos: [categoria, nome, descrição, base_price, is_pizza, available, preço G, preço GG, has_extras]
+// fixG/fixGG (opcionais): valor fixo da dividida por tamanho (modo 'fixed')
 const P = [];
-const pizza = (cat, name, desc, base, g, gg) => P.push({ cat, name, desc, base, is_pizza: true, avail: true, g, gg, has_extras: true });
+const pizza = (cat, name, desc, base, g, gg, fixG = null, fixGG = null) => P.push({ cat, name, desc, base, is_pizza: true, avail: true, g, gg, has_extras: true,
+  fracMode: fixG != null || fixGG != null ? 'fixed' : 'max', fixG, fixGG });
 const item = (cat, name, desc, price, avail = true, has_extras = false) => P.push({ cat, name, desc, base: price, is_pizza: false, avail, g: null, gg: null, has_extras });
 // Entradas — molhos como adicional (grupo "Adicionais Molhos"), não na descrição
 const entrada = (name, desc, price) => P.push({ cat: 'Entradas', name, desc: desc + ' Escolha 1 molho no adicional.', base: price, is_pizza: false, avail: true, g: null, gg: null, has_extras: true });
@@ -166,18 +168,18 @@ pizza('Pizzas Especiais', 'Maravilhosa', 'Molho, mussarela, peito de peru, manje
 pizza('Pizzas Especiais', 'Peito de Peru', 'Molho, mussarela, peito de peru, milho, ervilha e orégano.', 45, 45, 50);
 pizza('Pizzas Especiais', 'Mexicana', 'Molho, mussarela, calabresa, pimenta calabresa, cebola e orégano.', 45, 45, 50);
 
-// Primes — grupo 1: G65 GG70
-pizza('Pizzas Primes', 'Charque', 'Molho, mussarela, charque, cebola e orégano.', 65, 65, 70);
-pizza('Pizzas Primes', 'Charque c/ Creme Cheese', 'Molho, mussarela, charque, cebola, orégano e creme cheese.', 65, 65, 70);
-pizza('Pizzas Primes', 'Camarão Regional', 'Molho, mussarela, camarão regional, milho, ervilha e orégano.', 65, 65, 70);
-pizza('Pizzas Primes', 'Camarão c/ Catupiry', 'Molho, mussarela, camarão, catupiry, cebola e orégano.', 65, 65, 70);
-pizza('Pizzas Primes', 'Camarão c/ Creme Cheese', 'Molho, mussarela, camarão, creme cheese, milho, ervilha e orégano.', 65, 65, 70);
-pizza('Pizzas Primes', 'Filé', 'Molho, mussarela, carne e orégano.', 65, 65, 70);
-pizza('Pizzas Primes', 'Filé com Bacon', 'Molho, mussarela, carne, bacon, cebola e orégano.', 65, 65, 70);
-pizza('Pizzas Primes', 'Filé com Creme Cheese', 'Molho, mussarela, carne, creme cheese e orégano.', 65, 65, 70);
-pizza('Pizzas Primes', 'Carne de Sol', 'Molho, mussarela, carne de sol, cebola e orégano.', 65, 65, 70);
-pizza('Pizzas Primes', 'Atum', 'Molho, mussarela, atum, milho, ervilha e orégano.', 65, 65, 70);
-pizza('Pizzas Primes', 'Peruana', 'Molho, mussarela, atum, palmito, cebola e orégano.', 65, 65, 70);
+// Primes — grupo 1: G65 GG70 (meia fixa G50 / GG55)
+pizza('Pizzas Primes', 'Charque', 'Molho, mussarela, charque, cebola e orégano.', 65, 65, 70, 50, 55);
+pizza('Pizzas Primes', 'Charque c/ Creme Cheese', 'Molho, mussarela, charque, cebola, orégano e creme cheese.', 65, 65, 70, 50, 55);
+pizza('Pizzas Primes', 'Camarão Regional', 'Molho, mussarela, camarão regional, milho, ervilha e orégano.', 65, 65, 70, 50, 55);
+pizza('Pizzas Primes', 'Camarão c/ Catupiry', 'Molho, mussarela, camarão, catupiry, cebola e orégano.', 65, 65, 70, 50, 55);
+pizza('Pizzas Primes', 'Camarão c/ Creme Cheese', 'Molho, mussarela, camarão, creme cheese, milho, ervilha e orégano.', 65, 65, 70, 50, 55);
+pizza('Pizzas Primes', 'Filé', 'Molho, mussarela, carne e orégano.', 65, 65, 70, 50, 55);
+pizza('Pizzas Primes', 'Filé com Bacon', 'Molho, mussarela, carne, bacon, cebola e orégano.', 65, 65, 70, 50, 55);
+pizza('Pizzas Primes', 'Filé com Creme Cheese', 'Molho, mussarela, carne, creme cheese e orégano.', 65, 65, 70, 50, 55);
+pizza('Pizzas Primes', 'Carne de Sol', 'Molho, mussarela, carne de sol, cebola e orégano.', 65, 65, 70, 50, 55);
+pizza('Pizzas Primes', 'Atum', 'Molho, mussarela, atum, milho, ervilha e orégano.', 65, 65, 70, 50, 55);
+pizza('Pizzas Primes', 'Peruana', 'Molho, mussarela, atum, palmito, cebola e orégano.', 65, 65, 70, 50, 55);
 pizza('Pizzas Primes', 'Costela Desfiada', 'Molho, mussarela, costela desfiada, cebola crispy e orégano.', 65, 65, 70);
 pizza('Pizzas Primes', 'Costela Desfiada com Creme Cheese', 'Molho, mussarela, costela desfiada, creme cheese e orégano.', 65, 65, 70);
 pizza('Pizzas Primes', 'Strogonoff de Carne', 'Molho, mussarela, strogonoff de carne e batata palha.', 65, 65, 70);
@@ -264,7 +266,7 @@ let order = 1;
 let codigo = 1;
 let ok = 0;
 for (const p of P) {
-  const { data, error } = await db.from('products').insert([{
+  const baseRow = {
     store_id: STORE_ID,
     category_id: catIds[p.cat],
     name: p.name,
@@ -277,14 +279,35 @@ for (const p of P) {
     display_order: order++,
     codigo: codigo <= 999 ? codigo++ : null,
     image_url: null,
-  }]).select().single();
+  };
+  // Regra da dividida (exige migrations de fracionamento; cai para o básico se ausentes)
+  let withFrac = null;
+  if (p.is_pizza) withFrac = { ...baseRow, fraction_pricing_mode: p.fracMode || 'max', fraction_fixed_price: null };
+  let data = null, error = null;
+  if (withFrac) ({ data, error } = await db.from('products').insert([withFrac]).select().single());
+  else ({ data, error } = await db.from('products').insert([baseRow]).select().single());
+  if (error && withFrac && /fraction_pricing_mode/i.test(error.message)) {
+    console.warn('Sem coluna de regra da dividida — rode as migrations; regra ignorada p/', p.name);
+    ({ data, error } = await db.from('products').insert([baseRow]).select().single());
+  }
   if (error) { console.error('Falha produto', p.name, error.message); continue; }
   ok++;
   if (p.is_pizza && p.g != null) {
-    const r1 = await db.from('product_size_prices').upsert(
-      { product_id: data.id, size_id: sizeG.id, price: p.g }, { onConflict: 'product_id,size_id' });
-    const r2 = await db.from('product_size_prices').upsert(
-      { product_id: data.id, size_id: sizeGG.id, price: p.gg }, { onConflict: 'product_id,size_id' });
+    const rowG = { product_id: data.id, size_id: sizeG.id, price: p.g };
+    const rowGG = { product_id: data.id, size_id: sizeGG.id, price: p.gg };
+    if (p.fixG != null) rowG.fraction_fixed_price = p.fixG;
+    if (p.fixGG != null) rowGG.fraction_fixed_price = p.fixGG;
+    let r1 = await db.from('product_size_prices').upsert(rowG, { onConflict: 'product_id,size_id' });
+    if (r1.error && /fraction_fixed/i.test(r1.error.message)) {
+      delete rowG.fraction_fixed_price;
+      r1 = await db.from('product_size_prices').upsert(rowG, { onConflict: 'product_id,size_id' });
+      if (!r1.error) console.warn('Sem coluna de fixo por tamanho — rode a migration; fixo ignorado p/', p.name);
+    }
+    let r2 = await db.from('product_size_prices').upsert(rowGG, { onConflict: 'product_id,size_id' });
+    if (r2.error && /fraction_fixed/i.test(r2.error.message)) {
+      delete rowGG.fraction_fixed_price;
+      r2 = await db.from('product_size_prices').upsert(rowGG, { onConflict: 'product_id,size_id' });
+    }
     if (r1.error || r2.error) console.error('Falha preço', p.name, r1.error?.message, r2.error?.message);
   }
 }
