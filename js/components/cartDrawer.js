@@ -9,6 +9,7 @@ function setupCartDrawer(onProceedToCheckout) {
   const cartDrawerContent = document.getElementById('cartDrawerContent');
   const cs = window.customerService;
 
+  let lastCount = 0;
   function updateFloatingBar() {
     const count = window.appState.getItemCount();
     const total = window.appState.getTotal();
@@ -16,18 +17,18 @@ function setupCartDrawer(onProceedToCheckout) {
     if (count > 0) {
       floatingBar.classList.add('visible');
       floatingBar.innerHTML = window.safeHTML(`
-        <button class="floating-cart-btn" id="btnOpenCart">
-          <div style="display: flex; align-items: center; gap: 0.6rem;">
-            <span class="cart-badge-count">${count} ${count === 1 ? 'item' : 'itens'}</span>
-            <span>Ver Sacola</span>
-          </div>
-          <span style="font-size: 1.1rem; font-weight: 800;">${cs ? cs.formatCurrency(total) : 'R$ ' + total}</span>
+        <button class="floating-cart-btn${count !== lastCount ? ' pop' : ''}" id="btnOpenCart" aria-label="Abrir sacola com ${count} ${count === 1 ? 'item' : 'itens'}">
+          <span style="font-size: 1.25rem; line-height: 1;">🛒</span>
+          <span class="cart-badge-count">${count}</span>
+          <span style="font-size: 1rem; font-weight: 800;">${cs ? cs.formatCurrency(total) : 'R$ ' + total}</span>
         </button>
       `);
+      lastCount = count;
 
       const btnOpen = floatingBar.querySelector('#btnOpenCart');
       if (btnOpen) btnOpen.addEventListener('click', openDrawer);
     } else {
+      lastCount = 0;
       floatingBar.classList.remove('visible');
       closeDrawer();
     }

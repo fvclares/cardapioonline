@@ -347,38 +347,43 @@
   transform: scale(1.08);
 }
 
-/* Floating Bottom Bar (Sacola) */
+/* Floating Cart Button (Sacola) — canto inferior direito */
 .floating-cart-bar {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 1rem;
-  background: linear-gradient(180deg, rgba(14, 17, 23, 0) 0%, rgba(14, 17, 23, 0.95) 30%, #0e1117 100%);
+  bottom: 1.1rem;
+  right: 1.1rem;
+  left: auto;
+  padding: 0;
+  background: none;
   z-index: 90;
-  transform: translateY(120%);
-  transition: transform var(--transition-normal);
+  transform: translateY(140%) scale(0.8);
+  opacity: 0;
+  transition: transform var(--transition-normal), opacity var(--transition-normal);
   pointer-events: none;
 }
 
 .floating-cart-bar.visible {
-  transform: translateY(0);
+  transform: none;
+  opacity: 1;
   pointer-events: auto;
 }
 
 .floating-cart-btn {
-  width: 100%;
-  max-width: 600px;
-  margin: 0 auto;
+  width: auto;
+  margin: 0;
   background: linear-gradient(135deg, var(--primary) 0%, #d82f0f 100%);
   color: #fff;
-  padding: 0.95rem 1.35rem;
-  border-radius: var(--radius-full);
+  padding: 0.8rem 1.15rem 0.8rem 0.95rem;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 0.6rem;
   box-shadow: 0 8px 24px var(--primary-glow);
   font-weight: 700;
+  font-size: 0.95rem;
+  position: relative;
 }
 
 .floating-cart-btn:hover {
@@ -386,11 +391,28 @@
   box-shadow: 0 10px 28px var(--primary-glow);
 }
 
+@keyframes cartPop {
+  0% { transform: scale(0.6); }
+  60% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+.floating-cart-btn.pop {
+  animation: cartPop 0.35s ease;
+}
+
 .cart-badge-count {
-  background: rgba(255, 255, 255, 0.25);
-  padding: 0.2rem 0.6rem;
-  border-radius: var(--radius-full);
+  background: #fff;
+  color: var(--primary);
+  min-width: 1.6rem;
+  height: 1.6rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
   font-size: 0.85rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Modal Customization (Addons, Sizes, Notes) */

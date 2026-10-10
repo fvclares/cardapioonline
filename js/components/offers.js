@@ -192,7 +192,7 @@ function openOfferSelectionModal(offerId){
       }
       closeOfferSelectionModal();
       if(window.showToast) window.showToast('🎁 Combo adicionado!', 'success');
-      window.dispatchEvent(new CustomEvent('open_cart'));
+      // sacola NÃO abre sozinha: botão flutuante mostra a quantidade
     });
     // bind qty buttons
     content.querySelectorAll('.btn-qty-plus').forEach(btn=>{

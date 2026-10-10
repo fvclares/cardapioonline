@@ -744,8 +744,7 @@ function setupProductModal() {
         });
         if(window.showToast) window.showToast(`✅ ${selectedFraction.label} ${product.name} [${selectedSize?selectedSize.name.split('(')[0].trim():''}] adicionada! Complete no carrinho.`, 'success');
         closeModal();
-        // abre carrinho para feedback
-        setTimeout(()=> window.dispatchEvent(new CustomEvent('open_cart')), 300);
+        // sacola NÃO abre sozinha: botão flutuante mostra a quantidade
         return;
       }
       // Fluxo combinado antigo
