@@ -677,12 +677,6 @@
             </div>
           </div>
 
-          <div id="prodSizePricesContainer" style="display:none; margin-bottom: 1rem; background: var(--bg-input); padding: 0.85rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
-            <div class="form-label" style="margin-bottom: 0.5rem;">Preços por Tamanho (pizza)</div>
-            <div id="prodSizePricesFields"></div><p id="prodSizePricesError" role="alert" style="color:var(--status-closed);"></p>
-            <div class="form-help">Defina o preço para cada tamanho. Deixe vazio para indisponível naquele tamanho.</div>
-          </div>
-
           <div class="form-group" style="margin-bottom: 1rem;">
             <label class="form-label">Descrição / Ingredientes</label>
             <textarea id="prodDescriptionInput" rows="2" placeholder="Molho caseiro, mussarela especial, calabresa..." style="resize: none;"></textarea>
@@ -720,6 +714,12 @@
               <option value="fixed">🏷️ Valor específico — cada tamanho tem seu valor fixo (preencher abaixo)</option>
             </select>
             <span class="form-help">Se juntar sabores com regras diferentes, vale: fixo &gt; mais cara &gt; média.</span>
+          </div>
+
+          <div id="prodSizePricesContainer" style="display:none; margin-bottom: 1rem; background: var(--bg-input); padding: 0.85rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
+            <div class="form-label" style="margin-bottom: 0.5rem;">Preços por Tamanho (pizza)</div>
+            <div id="prodSizePricesFields"></div><p id="prodSizePricesError" role="alert" style="color:var(--status-closed);"></p>
+            <div class="form-help">Defina o preço para cada tamanho. Deixe vazio para indisponível naquele tamanho.</div>
           </div>
 
           <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer;">
