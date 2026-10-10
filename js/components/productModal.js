@@ -366,7 +366,10 @@ function setupProductModal() {
               ? `Esta metade neste tamanho: <strong>valor específico R$${Number(info.fixed).toFixed(2).replace('.',',')}</strong> — soma com a outra metade`
               : 'Esta pizza quando dividida: <strong>Mais cara</strong> — pizza completa vale o sabor mais caro (ex: ½ R$68 + ½ R$78 = R$78)';
           help.style.display='block';
-          help.innerHTML = window.safeHTML(`Você vai adicionar <strong>${selectedFraction.label} ${product.name.replace('Pizza ','')}</strong> ${sizeLabel?`[${sizeLabel}]`:''} por <strong>${cs?cs.formatCurrency(price):'R$ '+price}</strong> (pizza inteira).<br> No carrinho ficará como <strong>${selectedFraction.label}</strong> — complete com outra <strong>${selectedFraction.label}</strong> do mesmo tamanho. Validação ao fechar garante pizzas completas.<br><span style="font-size:0.72rem; color:var(--text-muted);">${modeDesc}. Pizza dividida = soma das metades.</span>`);
+          const priceText = (info.mode==='fixed' && info.fixed>0)
+            ? `${cs?cs.formatCurrency(info.fixed):'R$ '+info.fixed} (valor da metade)`
+            : `${cs?cs.formatCurrency(price):'R$ '+price} (pizza inteira)`;
+          help.innerHTML = window.safeHTML(`Você vai adicionar <strong>${selectedFraction.label} ${product.name.replace('Pizza ','')}</strong> ${sizeLabel?`[${sizeLabel}]`:''} por <strong>${priceText}</strong>.<br> No carrinho ficará como <strong>${selectedFraction.label}</strong> — complete com outra <strong>${selectedFraction.label}</strong> do mesmo tamanho. Validação ao fechar garante pizzas completas.<br><span style="font-size:0.72rem; color:var(--text-muted);">${modeDesc}. Pizza dividida = soma das metades.</span>`);
           help.style.borderColor='rgba(37,211,102,0.35)';
           help.style.background='rgba(37,211,102,0.08)';
           help.style.color='var(--text-primary)';
@@ -699,12 +702,13 @@ function setupProductModal() {
       const unit = calculateUnitPrice();
       let total;
       if(selectedFraction && selectedFraction.value < 1){
-        const mode = getCurrentPricingMode();
-        const effectiveQty = quantity * selectedFraction.value;
-        if(mode === 'proportional'){
-          total = unit * effectiveQty;
+        const info = getProductPricingInfo(product, selectedSize?.id);
+        if(info.mode === 'fixed' && info.fixed > 0){
+          // metade fixa: exibe o valor da metade (soma com a outra metade no carrinho)
+          total = info.fixed * (selectedFraction.value/0.5) * quantity;
         } else {
-          total = unit * Math.ceil(effectiveQty);
+          const effectiveQty = quantity * selectedFraction.value;
+          total = info.mode === 'average' ? unit * effectiveQty : unit * Math.ceil(effectiveQty);
         }
         // help já é atualizado em updateFractionUI, apenas garante total
       } else {

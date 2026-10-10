@@ -468,9 +468,13 @@ class StoreState {
         crust: crust ? { id: crust.id, name: crust.name, price: Number(crust.price || 0) } : null,
         extras: extras.map(e => ({ id: e.id, name: e.name, price: Number(e.price || 0)*Number(e.quantity||1), quantity: Number(e.quantity||1), groupId: e.groupId || null })),
         observation: observation.trim(),
-        itemTotal: unitPrice * quantity * fv // temporário proporcional para exibição; subtotal real é recalc via _computeFractionalSubtotal
+        // Exibição: metade fixa mostra o fixo (fixo×fração/0,5); demais, proporcional.
+        // Subtotal real é recalculado via _computeFractionalSubtotal.
+        itemTotal: (fracCfg.mode==='fixed' && fracCfg.fixed>0)
+          ? fracCfg.fixed * (fv/0.5) * quantity
+          : unitPrice * quantity * fv
       };
-      // itemTotal proporcional para listagem, mas getSubtotal recalcula agrupado
+      // getSubtotal recalcula agrupado; itemTotal acima é só para listagem
       this.cart.items.push(cartItem);
       this.notify();
       return cartItem;
@@ -566,9 +570,10 @@ class StoreState {
         item.itemTotal = item.unitPrice * item.quantity;
       } else {
         const fv = (item.fractionValue!=null) ? Number(item.fractionValue) : 1;
-        // Para fracionada, itemTotal é proporcional para exibição; subtotal real é recalculado via _computeFractionalSubtotal
-        // Mantém proporcional para listagem, mas getSubtotal corrige via modo
-        if(fv<1) item.itemTotal = item.unitPrice * item.quantity * fv;
+        // Exibição: metade fixa mostra o fixo; subtotal real via _computeFractionalSubtotal
+        const fmode = item.fractionMode || 'max';
+        const ffix = item.fractionFixed!=null ? Number(item.fractionFixed) : null;
+        if(fv<1) item.itemTotal = (fmode==='fixed' && ffix>0) ? ffix*(fv/0.5)*item.quantity : item.unitPrice * item.quantity * fv;
         else item.itemTotal = item.unitPrice * item.quantity;
       }
     }
