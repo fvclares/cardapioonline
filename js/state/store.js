@@ -126,10 +126,16 @@ class StoreState {
     return 'max';
   }
 
-  getProductFractionConfig(productId){
+  getProductFractionConfig(productId, sizeId){
     const p = (this.products||[]).find(x=> x.id===productId) || null;
     let mode = p ? this.normalizeFractionMode(p.fraction_pricing_mode) : null;
-    let fixed = p && p.fraction_fixed_price!=null ? Number(p.fraction_fixed_price) : null;
+    // Fixo é por tamanho (product_size_prices); nível do produto serve de fallback legado
+    let fixed = null;
+    if(sizeId){
+      const row = (this.productSizePrices||[]).find(v=> v.product_id===productId && v.size_id===sizeId);
+      if(row && row.fraction_fixed_price!=null) fixed = Number(row.fraction_fixed_price);
+    }
+    if(!(fixed>0) && p && p.fraction_fixed_price!=null) fixed = Number(p.fraction_fixed_price);
     if(!(fixed>0)) fixed = null;
     if(!mode){
       // fallback global antigo para produtos sem coluna (pré-migration)
@@ -347,7 +353,7 @@ class StoreState {
           const norm = (typeof this.normalizeFractionMode==='function') ? this.normalizeFractionMode.bind(this) : (v=> v==='fixed' ? 'fixed' : 'max');
           if(!mode){
             if(typeof this.getProductFractionConfig==='function'){
-              const cfg = this.getProductFractionConfig(item.productId);
+              const cfg = this.getProductFractionConfig(item.productId, item.size?.id);
               mode = cfg.mode; fixed = cfg.fixed;
             } else { mode = 'max'; fixed = null; }
           } else {
@@ -440,7 +446,7 @@ class StoreState {
       const displayName = `${label} ${product.name.replace('Pizza ','')}` + (sizeShort ? ` [${sizeShort}]` : '');
 
       const fracCfg = (typeof this.getProductFractionConfig==='function')
-        ? this.getProductFractionConfig(product.id)
+        ? this.getProductFractionConfig(product.id, size?.id)
         : { mode: 'max', fixed: null };
       const cartItem = {
         id: 'cart_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
@@ -481,7 +487,7 @@ class StoreState {
       })];
       // Regra por produto no fluxo combinado: fixo > mais cara > média
       const cfgOf = (typeof this.getProductFractionConfig==='function')
-        ? (pid => this.getProductFractionConfig(pid))
+        ? (pid => this.getProductFractionConfig(pid, size?.id))
         : (() => ({ mode: 'max', fixed: null }));
       const parts = [product, ...allFlavors].map((p,i)=> ({ cfg: cfgOf(p.id), price: prices[i] }));
       const fixedCands = parts.filter(x=> x.cfg.mode==='fixed' && x.cfg.fixed>0).map(x=> x.cfg.fixed);

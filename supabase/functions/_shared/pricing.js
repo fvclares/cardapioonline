@@ -24,13 +24,21 @@ export function priceOrder(input, catalog) {
   if(value==='fixed') return 'fixed';
   return 'max';
  };
- // Regra por produto com fallback para o modelo global antigo (pré-migration)
+ // Regra por produto com fallback para o modelo global antigo (pré-migration).
+ // O fixo é por tamanho (product_size_prices); nível do produto serve de fallback legado.
  const globalFallback=settings.fraction_pricing_mode==='proportional'||settings.fraction_pricing_mode==='proporcional'||settings.fraction_pricing_mode==='average'?'average':'max';
- const productFractionConfig=p=>{
+ const productFractionConfig=(p,sizeId)=>{
   const raw=p?.fraction_pricing_mode;
   let mode=raw?normFractionMode(raw):globalFallback;
   let fixedCents=null;
-  if(p?.fraction_fixed_price!=null){
+  if(sizeId){
+   const row=prices.find(v=>v.product_id===p?.id&&v.size_id===sizeId);
+   if(row?.fraction_fixed_price!=null){
+    const n=Number(row.fraction_fixed_price);
+    if(Number.isFinite(n)&&n>0) fixedCents=money(n);
+   }
+  }
+  if(fixedCents==null&&p?.fraction_fixed_price!=null){
    const n=Number(p.fraction_fixed_price);
    if(Number.isFinite(n)&&n>0) fixedCents=money(n);
   }
@@ -80,7 +88,7 @@ export function priceOrder(input, catalog) {
   let unit;
   if(flavors.length){
    const allP=[p,...flavors];
-   const cfgs=allP.map(productFractionConfig);
+   const cfgs=allP.map(q=>productFractionConfig(q,size?.id));
    const fixedCands=cfgs.filter(c=>c.mode==='fixed'&&c.fixedCents!=null).map(c=>c.fixedCents);
    if(fixedCands.length) unit=Math.max(...fixedCands);
    else if(cfgs.every(c=>c.mode==='average')){
@@ -142,7 +150,7 @@ export function priceOrder(input, catalog) {
   const item={productId:p.id,productName:label+[p.name,...flavors.map(f=>f.name)].join(' + ')+(size?' ['+size.name+']':''),productCodigo:p.codigo,
    size:size?{id:size.id,name:size.name}:null,flavorIds,quantity:qty,fractionValue:fraction,unitPrice:unit/100,crust,extras,observation,itemTotal:Math.round(unit*qty*fraction)/100};
   if(denominator>1){
-   const cfg=productFractionConfig(p);
+   const cfg=productFractionConfig(p,size?.id);
    const entries=fractionGroups.get(size.id)||[];
    for(let i=0;i<qty;i++) entries.push({item,unit,units:12/denominator,mode:cfg.mode,fixedCents:cfg.fixedCents});
    fractionGroups.set(size.id,entries);

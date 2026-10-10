@@ -322,10 +322,19 @@ function setupProductModal() {
       if(v==='fixed') return 'fixed';
       return 'max';
     }
-    function getProductPricingInfo(prod){
+    function getProductPricingInfo(prod, sizeId){
       const raw = prod?.fraction_pricing_mode;
       let mode = normFractionMode(raw);
-      let fixed = prod?.fraction_fixed_price!=null ? Number(prod.fraction_fixed_price) : null;
+      // Fixo é por tamanho; nível do produto serve de fallback legado
+      let fixed = null;
+      try{
+        if(sizeId){
+          const rows = window.appState?.productSizePrices || window.storage?.getProductSizePrices?.(prod?.id) || [];
+          const row = (rows||[]).find(v=> v.product_id===prod?.id && v.size_id===sizeId);
+          if(row && row.fraction_fixed_price!=null) fixed = Number(row.fraction_fixed_price);
+        }
+      }catch{}
+      if(!(fixed>0) && prod?.fraction_fixed_price!=null) fixed = Number(prod.fraction_fixed_price);
       if(!(fixed>0)) fixed = null;
       if(!raw){
         // fallback global antigo (pré-migration) para não quebrar exibição
@@ -350,11 +359,11 @@ function setupProductModal() {
         if(isFraction){
           const sizeLabel = selectedSize ? selectedSize.name.split('(')[0].trim() : '';
           const price = getPriceForProductSize(product, selectedSize);
-          const info = getProductPricingInfo(product);
+          const info = getProductPricingInfo(product, selectedSize?.id);
           const modeDesc = info.mode==='average'
             ? 'Esta pizza quando dividida: <strong>Média</strong> — cada ½ vale metade do preço (ex: ½ R$68 + ½ R$78 = R$73)'
             : info.mode==='fixed' && info.fixed>0
-              ? `Esta pizza quando dividida: <strong>valor específico R$${Number(info.fixed).toFixed(2).replace('.',',')}</strong> — vale para qualquer combinação`
+              ? `Esta pizza quando dividida neste tamanho: <strong>valor específico R$${Number(info.fixed).toFixed(2).replace('.',',')}</strong>`
               : 'Esta pizza quando dividida: <strong>Mais cara</strong> — pizza completa vale o sabor mais caro (ex: ½ R$68 + ½ R$78 = R$78)';
           help.style.display='block';
           help.innerHTML = window.safeHTML(`Você vai adicionar <strong>${selectedFraction.label} ${product.name.replace('Pizza ','')}</strong> ${sizeLabel?`[${sizeLabel}]`:''} por <strong>${cs?cs.formatCurrency(price):'R$ '+price}</strong> (pizza inteira).<br> No carrinho ficará como <strong>${selectedFraction.label}</strong> — complete com outra <strong>${selectedFraction.label}</strong> do mesmo tamanho. Validação ao fechar garante pizzas completas.<br><span style="font-size:0.72rem; color:var(--text-muted);">${modeDesc}. Se juntar sabores com regras diferentes, vale: fixo &gt; mais cara &gt; média.</span>`);

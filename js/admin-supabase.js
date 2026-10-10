@@ -1127,8 +1127,7 @@ async function renderProducts() {
     let fracBadge = '';
     if(prod.is_pizza){
       const fm = prod.fraction_pricing_mode==='fixed' ? 'fixed' : (prod.fraction_pricing_mode==='average'||prod.fraction_pricing_mode==='proportional'||prod.fraction_pricing_mode==='proporcional' ? 'average' : 'max');
-      const label = fm==='fixed'
-        ? `🏷️ Dividida: R$${Number(prod.fraction_fixed_price||0).toFixed(2).replace('.',',')}`
+      const label = fm==='fixed' ? '🏷️ Dividida: fixo por tamanho'
         : fm==='average' ? '⚖️ Dividida: média' : '💎 Dividida: mais cara';
       fracBadge = `<span style="font-size:0.72rem; color:var(--text-muted); font-weight:600;"> • ${label}</span>`;
     }
@@ -1225,8 +1224,6 @@ async function openProductModal(prodId = null) {
   const priceContainer = document.getElementById('prodSizePricesContainer');
   const fracContainer = document.getElementById('prodFractionPricingContainer');
   const fracModeInput = document.getElementById('prodFractionModeInput');
-  const fracFixedGroup = document.getElementById('prodFractionFixedGroup');
-  const fracFixedInput = document.getElementById('prodFractionFixedInput');
   const modal = document.getElementById('productModalBackdrop');
 
   function normFractionMode(v){
@@ -1237,13 +1234,13 @@ async function openProductModal(prodId = null) {
   function syncFractionUI(){
     const isPizza = isPizzaInput.checked;
     if(fracContainer) fracContainer.style.display = isPizza ? 'block' : 'none';
-    if(fracFixedGroup) fracFixedGroup.style.display = (isPizza && fracModeInput?.value==='fixed') ? 'block' : 'none';
+    const showFixed = isPizza && fracModeInput?.value==='fixed';
+    document.querySelectorAll('#prodSizePricesFields .prod-fixed-wrap').forEach(el=>{ el.style.display = showFixed ? 'flex' : 'none'; });
   }
   if(fracModeInput && !fracModeInput._bound){
     fracModeInput._bound = true;
     fracModeInput.addEventListener('change', syncFractionUI);
   }
-  if(fracFixedInput) attachCurrencyMask(fracFixedInput);
 
   function syncFeaturedUI(){
     if (featuredGroup) featuredGroup.style.display = featuredInput.checked ? 'flex' : 'none';
@@ -1291,7 +1288,6 @@ async function openProductModal(prodId = null) {
       extrasInput.checked = !!prod.has_extras;
       availInput.checked = prod.available !== false;
       if(fracModeInput) fracModeInput.value = normFractionMode(prod.fraction_pricing_mode);
-      if(fracFixedInput) fracFixedInput.value = prod.fraction_fixed_price != null ? formatCurrencyInput(prod.fraction_fixed_price) : formatCurrencyInput(0);
       syncFractionUI();
       featuredInput.checked = !!prod.is_featured;
       featuredOrderInput.value = String(prod.featured_order || 1);
@@ -1341,7 +1337,6 @@ async function openProductModal(prodId = null) {
     extrasInput.checked = true;
     availInput.checked = true;
     if(fracModeInput) fracModeInput.value = 'max';
-    if(fracFixedInput) fracFixedInput.value = formatCurrencyInput(0);
     syncFractionUI();
     featuredInput.checked = false;
     featuredOrderInput.value = '1';
@@ -1416,11 +1411,35 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
   if(isPizza&&document.getElementById('prodSizePricesFields').dataset.loaded!=='true'){
     document.getElementById('prodSizePricesError').textContent='Não foi possível carregar os tamanhos e preços. Reabra o produto antes de salvar.';return;
   }
+  // Precificação fracionada por produto: média | mais cara | fixo por tamanho
+  let fracMode = document.getElementById('prodFractionModeInput')?.value || 'max';
+  if(fracMode==='proportional'||fracMode==='proporcional') fracMode='average';
+  if(!['max','average','fixed'].includes(fracMode)) fracMode='max';
+  const requireFixed = isPizza && fracMode==='fixed';
   const fields=[...document.querySelectorAll('#prodSizePricesFields input[data-size-id]')];
-  const validation=validateProductPrices(isPizza,document.getElementById('prodAvailableInput').checked,fields.map(f=>({id:f.dataset.sizeId,active:f.dataset.active==='true',value:f.value})));
-  fields.forEach(f=>{const error=validation.errors[f.dataset.sizeId]||'';f.setCustomValidity(error);document.getElementById('price-error-'+f.dataset.sizeId).textContent=error;f.setAttribute('aria-invalid',String(!!error));});
+  const fixedBySize={};
+  document.querySelectorAll('#prodSizePricesFields input[data-fixed-for]').forEach(inp=>{ fixedBySize[inp.dataset.fixedFor]=inp.value; });
+  const validation=validateProductPrices(isPizza,document.getElementById('prodAvailableInput').checked,fields.map(f=>({id:f.dataset.sizeId,active:f.dataset.active==='true',value:f.value,fixed:fixedBySize[f.dataset.sizeId]})),{requireFixed});
+  fields.forEach(f=>{
+    const error=validation.errors[f.dataset.sizeId]||'';
+    f.setCustomValidity(error);
+    document.getElementById('price-error-'+f.dataset.sizeId).textContent=error;
+    f.setAttribute('aria-invalid',String(!!error));
+    const fixedInp=document.querySelector(`#prodSizePricesFields input[data-fixed-for="${f.dataset.sizeId}"]`);
+    const fixedErr=validation.errors['fixed-'+f.dataset.sizeId]||'';
+    if(fixedInp){ fixedInp.setCustomValidity(fixedErr); fixedInp.setAttribute('aria-invalid',String(!!fixedErr)); }
+    const fixedMsg=document.getElementById('fixed-error-'+f.dataset.sizeId);
+    if(fixedMsg) fixedMsg.textContent=fixedErr;
+  });
   document.getElementById('prodSizePricesError').textContent=validation.errors._sizes||'';
-  if(Object.keys(validation.errors).length){fields.find(f=>validation.errors[f.dataset.sizeId])?.focus();return;}
+  if(Object.keys(validation.errors).length){
+    const badField=fields.find(f=>validation.errors[f.dataset.sizeId]||validation.errors['fixed-'+f.dataset.sizeId]);
+    if(badField){
+      if(validation.errors[badField.dataset.sizeId]) badField.focus();
+      else document.querySelector(`#prodSizePricesFields input[data-fixed-for="${badField.dataset.sizeId}"]`)?.focus();
+    }
+    return;
+  }
 
   // Upload com compressão se houver arquivo novo
   let imageUrl = currentUrl || '';
@@ -1467,19 +1486,7 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
     }
   }
   // Se pizza e tem tamanhos, base_price será o menor preço por tamanho (fallback)
-  // Precificação fracionada por produto: média | mais cara | valor fixo
-  let fracMode = document.getElementById('prodFractionModeInput')?.value || 'max';
-  if(fracMode==='proportional'||fracMode==='proporcional') fracMode='average';
-  if(!['max','average','fixed'].includes(fracMode)) fracMode='max';
-  let fracFixed = null;
-  if(isPizza && fracMode==='fixed'){
-    fracFixed = parseCurrency(document.getElementById('prodFractionFixedInput')?.value) || 0;
-    if(!(fracFixed>0) || fracFixed>99999999.99){
-      showToast('Informe o valor específico da dividida (maior que zero).', 'error');
-      document.getElementById('prodFractionFixedInput')?.focus();
-      return;
-    }
-  }
+  // Fixo da dividida agora é por tamanho (vai em p_prices); nível do produto fica nulo.
   const productData = {
     codigo: codigoVal,
     name: document.getElementById('prodNameInput').value.trim(),
@@ -1494,21 +1501,29 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
     is_featured: wantFeatured,
     featured_order: Number(document.getElementById('prodFeaturedOrderInput').value) || 1,
     fraction_pricing_mode: isPizza ? fracMode : 'max',
-    fraction_fixed_price: isPizza && fracMode==='fixed' ? fracFixed : null
+    fraction_fixed_price: null
   };
 
   showLoading(true);
   try {
     const {data: saved, error}=await supabase.rpc('save_product_with_prices',{p_store_id:currentStoreId,p_product_id:id||null,p_product:productData,p_prices:validation.prices});
     if(error)throw error;
-    // Compat: RPC antigo ignora os campos novos — tenta update direto (falha silenciosa pré-migration com aviso)
+    // Compat: garante modo no produto + fixo por tamanho (para RPC pré-migration, com aviso)
     const savedId = saved?.id || id || null;
     if(savedId && isPizza){
       try {
-        const { error: fracErr } = await productsApi.update(savedId, { fraction_pricing_mode: fracMode, fraction_fixed_price: fracMode==='fixed' ? fracFixed : null });
+        const { error: fracErr } = await productsApi.update(savedId, { fraction_pricing_mode: fracMode });
         if(fracErr && /fraction/i.test(fracErr.message||'')){
-          console.warn('Colunas de precificação fracionada ainda não existem:', fracErr.message);
+          console.warn('Coluna de precificação fracionada ainda não existe:', fracErr.message);
           showToast('⚠️ Produto salvo, mas sem regra da dividida — rode a migration product_fraction_pricing no Supabase', 'info');
+        } else if(!fracErr && fracMode==='fixed'){
+          // RPC antigo ignora fraction_fixed_price por tamanho — tenta gravar direto
+          const rows = validation.prices.map(p=>({ product_id: savedId, size_id: p.size_id, price: p.price, fraction_fixed_price: p.fraction_fixed_price }));
+          const { error: fixedErr } = await supabase.from('product_size_prices').upsert(rows, { onConflict: 'product_id,size_id' });
+          if(fixedErr && /fraction_fixed/i.test(fixedErr.message||'')){
+            console.warn('Coluna fraction_fixed_price ainda não existe:', fixedErr.message);
+            showToast('⚠️ Produto salvo, mas sem valor fixo por tamanho — rode a migration product_size_fraction_fixed no Supabase', 'info');
+          } else if(fixedErr) throw fixedErr;
         }
       } catch(fracEx){
         console.warn('Fallback precificação fracionada falhou', fracEx?.message);
@@ -2348,22 +2363,31 @@ async function renderProdSizePrices(productId){
   document.getElementById('prodSizePricesError').textContent='';
   const {data:sizes,error:sizeError}=await pizzaSizesApi.listAll(currentStoreId);
   if(sizeError){document.getElementById('prodSizePricesError').textContent='Falha ao carregar tamanhos. Reabra o produto.';return;}
-  let pricesMap={};
+  let pricesMap={}, fixedMap={};
   if(productId){
     const {data:prices,error}=await productSizePricesApi.listByProduct(productId);
     if(error){document.getElementById('prodSizePricesError').textContent='Falha ao carregar preços. Reabra o produto.';return;}
-    (prices||[]).forEach(p=>pricesMap[p.size_id]=p.price);
+    (prices||[]).forEach(p=>{pricesMap[p.size_id]=p.price; if(p.fraction_fixed_price!=null) fixedMap[p.size_id]=p.fraction_fixed_price;});
   }
   container.dataset.loaded='true';
   if(!sizes?.length){container.textContent='Cadastre tamanhos em Tamanhos Pizza primeiro.';return;}
+  const showFixed = document.getElementById('prodFractionModeInput')?.value==='fixed';
   container.innerHTML = window.safeHTML(sizes.map(s=>`
-    <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
+    <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.15rem;">
       <span style="flex:1; font-size:0.85rem; font-weight:600;">${s.name} — ${s.is_active ? 'Ativo' : 'Inativo (não conta para disponibilidade)'} <span style="color:var(--text-muted); font-weight:400;">(${s.slices}f • ${s.max_flavors} sab)</span></span>
-      <input type="text" inputmode="decimal" placeholder="Não oferecido" data-active="${s.is_active}" aria-describedby="price-error-${s.id}" data-size-id="${s.id}" value="${pricesMap[s.id]!==undefined ? formatCurrencyInput(pricesMap[s.id]) : ''}" style="width:110px; text-align:right;" />
+      <input type="text" inputmode="decimal" placeholder="Não oferecido" title="Preço normal" data-active="${s.is_active}" aria-describedby="price-error-${s.id}" data-size-id="${s.id}" value="${pricesMap[s.id]!==undefined ? formatCurrencyInput(pricesMap[s.id]) : ''}" style="width:110px; text-align:right;" />
+    </div>
+    <div class="prod-fixed-wrap" data-fixed-wrap="${s.id}" style="display:${showFixed?'flex':'none'}; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
+      <span style="flex:1; font-size:0.78rem; color:var(--text-muted);">🏷️ Valor fixo quando dividida (${s.name.split('(')[0].trim()}) *</span>
+      <input type="text" inputmode="decimal" placeholder="0,00" aria-describedby="fixed-error-${s.id}" data-fixed-for="${s.id}" value="${fixedMap[s.id]!==undefined ? formatCurrencyInput(fixedMap[s.id]) : ''}" style="width:110px; text-align:right;" />
     </div>
   `).join(''));
   container.querySelectorAll('input[data-size-id]').forEach(inp=>{
     const message=document.createElement('small');message.id='price-error-'+inp.dataset.sizeId;message.setAttribute('role','alert');message.style.color='var(--status-closed)';inp.parentElement.after(message);
+    inp.addEventListener('input',()=>{inp.setCustomValidity('');inp.removeAttribute('aria-invalid');message.textContent='';});
+  });
+  container.querySelectorAll('input[data-fixed-for]').forEach(inp=>{
+    const message=document.createElement('small');message.id='fixed-error-'+inp.dataset.fixedFor;message.setAttribute('role','alert');message.style.color='var(--status-closed)';inp.parentElement.after(message);
     inp.addEventListener('input',()=>{inp.setCustomValidity('');inp.removeAttribute('aria-invalid');message.textContent='';});
   });
 }
