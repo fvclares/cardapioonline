@@ -180,17 +180,17 @@ pizza('Pizzas Primes', 'Filé com Creme Cheese', 'Molho, mussarela, carne, creme
 pizza('Pizzas Primes', 'Carne de Sol', 'Molho, mussarela, carne de sol, cebola e orégano.', 65, 65, 70, 50, 55);
 pizza('Pizzas Primes', 'Atum', 'Molho, mussarela, atum, milho, ervilha e orégano.', 65, 65, 70, 50, 55);
 pizza('Pizzas Primes', 'Peruana', 'Molho, mussarela, atum, palmito, cebola e orégano.', 65, 65, 70, 50, 55);
-pizza('Pizzas Primes', 'Costela Desfiada', 'Molho, mussarela, costela desfiada, cebola crispy e orégano.', 65, 65, 70);
-pizza('Pizzas Primes', 'Costela Desfiada com Creme Cheese', 'Molho, mussarela, costela desfiada, creme cheese e orégano.', 65, 65, 70);
-pizza('Pizzas Primes', 'Strogonoff de Carne', 'Molho, mussarela, strogonoff de carne e batata palha.', 65, 65, 70);
-pizza('Pizzas Primes', 'Strogonoff de Frango', 'Molho, mussarela, strogonoff de frango e batata palha.', 65, 65, 70);
-pizza('Pizzas Primes', 'Strogonoff de Camarão Regional', 'Molho, mussarela, strogonoff de camarão regional e batata palha.', 65, 65, 70);
+pizza('Pizzas Primes', 'Costela Desfiada', 'Molho, mussarela, costela desfiada, cebola crispy e orégano.', 65, 65, 70, 65, 70);
+pizza('Pizzas Primes', 'Costela Desfiada com Creme Cheese', 'Molho, mussarela, costela desfiada, creme cheese e orégano.', 65, 65, 70, 65, 70);
+pizza('Pizzas Primes', 'Strogonoff de Carne', 'Molho, mussarela, strogonoff de carne e batata palha.', 65, 65, 70, 65, 70);
+pizza('Pizzas Primes', 'Strogonoff de Frango', 'Molho, mussarela, strogonoff de frango e batata palha.', 65, 65, 70, 65, 70);
+pizza('Pizzas Primes', 'Strogonoff de Camarão Regional', 'Molho, mussarela, strogonoff de camarão regional e batata palha.', 65, 65, 70, 65, 70);
 // grupo 2: G80 GG100
 pizza('Pizzas Primes', 'Camarão Rosa', 'Molho, mussarela, camarão rosa e orégano.', 80, 80, 100);
 pizza('Pizzas Primes', 'Camarão Rosa c/ Catupiry', 'Molho branco, mussarela, camarão rosa e orégano.', 80, 80, 100);
-// grupo 3: G70 GG75
-pizza('Pizzas Primes', 'Filé com Frita', 'Molho, mussarela, filé e batata frita.', 70, 70, 75);
-pizza('Pizzas Primes', 'Carne de Sol c/ Fritas', 'Molho, mussarela, carne de sol com fritas e orégano.', 70, 70, 75);
+// grupo 3: G70 GG75 (meia fixa G55 / GG60)
+pizza('Pizzas Primes', 'Filé com Frita', 'Molho, mussarela, filé e batata frita.', 70, 70, 75, 55, 60);
+pizza('Pizzas Primes', 'Carne de Sol c/ Fritas', 'Molho, mussarela, carne de sol com fritas e orégano.', 70, 70, 75, 55, 60);
 
 // Doces G35 GG40
 pizza('Pizzas Doces', 'Brigadeiro', 'Brigadeiro com granulado.', 35, 35, 40);
