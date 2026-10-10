@@ -1127,7 +1127,7 @@ async function renderProducts() {
     let fracBadge = '';
     if(prod.is_pizza){
       const fm = prod.fraction_pricing_mode==='fixed' ? 'fixed' : (prod.fraction_pricing_mode==='average'||prod.fraction_pricing_mode==='proportional'||prod.fraction_pricing_mode==='proporcional' ? 'average' : 'max');
-      const label = fm==='fixed' ? '🏷️ Dividida: fixo por tamanho'
+      const label = fm==='fixed' ? '🏷️ Dividida: soma das metades'
         : fm==='average' ? '⚖️ Dividida: média' : '💎 Dividida: mais cara';
       fracBadge = `<span style="font-size:0.72rem; color:var(--text-muted); font-weight:600;"> • ${label}</span>`;
     }
@@ -2378,7 +2378,7 @@ async function renderProdSizePrices(productId){
       <input type="text" inputmode="decimal" placeholder="Não oferecido" title="Preço normal" data-active="${s.is_active}" aria-describedby="price-error-${s.id}" data-size-id="${s.id}" value="${pricesMap[s.id]!==undefined ? formatCurrencyInput(pricesMap[s.id]) : ''}" style="width:110px; text-align:right;" />
     </div>
     <div class="prod-fixed-wrap" data-fixed-wrap="${s.id}" style="display:${showFixed?'flex':'none'}; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
-      <span style="flex:1; font-size:0.78rem; color:var(--text-muted);">🏷️ Valor fixo quando dividida (${s.name.split('(')[0].trim()}) *</span>
+      <span style="flex:1; font-size:0.78rem; color:var(--text-muted);">🏷️ Valor da metade quando dividida (${s.name.split('(')[0].trim()}) *</span>
       <input type="text" inputmode="decimal" placeholder="0,00" aria-describedby="fixed-error-${s.id}" data-fixed-for="${s.id}" value="${fixedMap[s.id]!==undefined ? formatCurrencyInput(fixedMap[s.id]) : ''}" style="width:110px; text-align:right;" />
     </div>
   `).join(''));

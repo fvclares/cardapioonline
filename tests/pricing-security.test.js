@@ -85,6 +85,30 @@ for(const mode of ['max','proportional']){
   assert.equal(r.total,mode==='max'?80:70);
  });
 }
+test('fixed half is summed with the other half (50 + 40 = 90)',()=>{
+ const c=catalog();
+ c.products[0].fraction_pricing_mode='fixed';
+ c.prices[0].fraction_fixed_price=50;
+ const r=priceOrder(order([{...item(),fractionValue:0.5},{...item('b'),fractionValue:0.5}]),c);
+ assert.equal(r.total,90);
+});
+test('two fixed halves are summed (50 + 55 = 105)',()=>{
+ const c=catalog();
+ c.products[0].fraction_pricing_mode='fixed';
+ c.products[1].fraction_pricing_mode='fixed';
+ c.prices[0].fraction_fixed_price=50;
+ c.prices[1].fraction_fixed_price=55;
+ const r=priceOrder(order([{...item(),fractionValue:0.5},{...item('b'),fractionValue:0.5}]),c);
+ assert.equal(r.total,105);
+});
+test('fixed quarter contributes half the fixed value (4 x 25 = 100)',()=>{
+ const c=catalog();
+ c.products[0].fraction_pricing_mode='fixed';
+ c.prices[0].fraction_fixed_price=50;
+ const halves=Array.from({length:4},()=>({...item(),fractionValue:0.25}));
+ const r=priceOrder(order(halves),c);
+ assert.equal(r.total,100);
+});
 test('incompatible half sizes cannot complete one another',()=>{
  assert.throws(()=>priceOrder(order([{...item(),fractionValue:0.5},{...item('b'),size:{id:'m'},fractionValue:0.5}]),catalog()),/Complete/);
 });

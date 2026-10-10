@@ -363,10 +363,10 @@ function setupProductModal() {
           const modeDesc = info.mode==='average'
             ? 'Esta pizza quando dividida: <strong>Média</strong> — cada ½ vale metade do preço (ex: ½ R$68 + ½ R$78 = R$73)'
             : info.mode==='fixed' && info.fixed>0
-              ? `Esta pizza quando dividida neste tamanho: <strong>valor específico R$${Number(info.fixed).toFixed(2).replace('.',',')}</strong>`
+              ? `Esta metade neste tamanho: <strong>valor específico R$${Number(info.fixed).toFixed(2).replace('.',',')}</strong> — soma com a outra metade`
               : 'Esta pizza quando dividida: <strong>Mais cara</strong> — pizza completa vale o sabor mais caro (ex: ½ R$68 + ½ R$78 = R$78)';
           help.style.display='block';
-          help.innerHTML = window.safeHTML(`Você vai adicionar <strong>${selectedFraction.label} ${product.name.replace('Pizza ','')}</strong> ${sizeLabel?`[${sizeLabel}]`:''} por <strong>${cs?cs.formatCurrency(price):'R$ '+price}</strong> (pizza inteira).<br> No carrinho ficará como <strong>${selectedFraction.label}</strong> — complete com outra <strong>${selectedFraction.label}</strong> do mesmo tamanho. Validação ao fechar garante pizzas completas.<br><span style="font-size:0.72rem; color:var(--text-muted);">${modeDesc}. Se juntar sabores com regras diferentes, vale: fixo &gt; mais cara &gt; média.</span>`);
+          help.innerHTML = window.safeHTML(`Você vai adicionar <strong>${selectedFraction.label} ${product.name.replace('Pizza ','')}</strong> ${sizeLabel?`[${sizeLabel}]`:''} por <strong>${cs?cs.formatCurrency(price):'R$ '+price}</strong> (pizza inteira).<br> No carrinho ficará como <strong>${selectedFraction.label}</strong> — complete com outra <strong>${selectedFraction.label}</strong> do mesmo tamanho. Validação ao fechar garante pizzas completas.<br><span style="font-size:0.72rem; color:var(--text-muted);">${modeDesc}. Pizza dividida = soma das metades.</span>`);
           help.style.borderColor='rgba(37,211,102,0.35)';
           help.style.background='rgba(37,211,102,0.08)';
           help.style.color='var(--text-primary)';

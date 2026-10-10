@@ -46,9 +46,11 @@ export function priceOrder(input, catalog) {
   return {mode,fixedCents};
  };
  // parts: [{unit (cents), units (12-based), mode, fixedCents}]
+ // Com parte fixa, a pizza é a SOMA das parcelas: fixa contribui
+ // fixo×(fração/0,5) (½=fixo, ¼=metade do fixo); demais, proporcional.
  const priceFractionalPizzaCents=parts=>{
-  const fixedCands=parts.filter(x=>x.mode==='fixed'&&x.fixedCents!=null).map(x=>x.fixedCents);
-  if(fixedCands.length) return Math.max(...fixedCands);
+  if(parts.some(x=>x.mode==='fixed'&&x.fixedCents!=null))
+   return parts.reduce((s,x)=>s+(x.mode==='fixed'&&x.fixedCents!=null?Math.round(x.fixedCents*x.units/6):Math.round(x.unit*x.units/12)),0);
   if(parts.some(x=>x.mode!=='average')) return Math.max(...parts.map(x=>x.unit));
   // média = soma proporcional
   return parts.reduce((s,x)=>s+Math.round(x.unit*x.units/12),0);
@@ -84,17 +86,21 @@ export function priceOrder(input, catalog) {
   const flavorIds=raw.flavorIds||[];
   if(!Array.isArray(flavorIds)||flavorIds.length>3||flavorIds.length>(size?.max_flavors||1)-1) fail('Sabores inválidos.');
   const flavors=flavorIds.map(id=>{const f=product(id);if(!f.is_pizza) fail('Sabor inválido.');return f;});
-  // Pizza inteira combinada (legado): fixo > mais cara > média
+  // Pizza inteira combinada (legado): com parte fixa, soma as parcelas
+  // (fixa: fixo×(quota/0,5); demais: preço×quota); senão, mais cara ou média.
   let unit;
   if(flavors.length){
    const allP=[p,...flavors];
    const cfgs=allP.map(q=>productFractionConfig(q,size?.id));
-   const fixedCands=cfgs.filter(c=>c.mode==='fixed'&&c.fixedCents!=null).map(c=>c.fixedCents);
-   if(fixedCands.length) unit=Math.max(...fixedCands);
+   const pricesCents=allP.map(f=>price(f,size));
+   if(cfgs.some(c=>c.mode==='fixed'&&c.fixedCents!=null)){
+    const share=1/allP.length;
+    unit=cfgs.reduce((s,c,i)=>s+(c.mode==='fixed'&&c.fixedCents!=null?Math.round(c.fixedCents*share/0.5):Math.round(pricesCents[i]*share)),0);
+   }
    else if(cfgs.every(c=>c.mode==='average')){
-    const sumCents=[p,...flavors].map(f=>price(f,size)).reduce((s,v)=>s+v,0);
+    const sumCents=pricesCents.reduce((s,v)=>s+v,0);
     unit=Math.round(sumCents/allP.length);
-   } else unit=Math.max(price(p,size),...flavors.map(f=>price(f,size)));
+   } else unit=Math.max(...pricesCents);
   } else unit=price(p,size);
   const addon=(selection,kind)=>{
    if(!selection) return null;

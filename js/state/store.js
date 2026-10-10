@@ -147,12 +147,14 @@ class StoreState {
     return { mode, fixed };
   }
 
-  // Preço de uma pizza completa fracionada a partir das partes:
-  // prioridade: fixo > mais cara > média (proporcional).
+  // Preço de uma pizza completa fracionada a partir das partes.
+  // Com parte fixa, a pizza é a SOMA das parcelas: fixa contribui
+  // fixo×(fração/0,5) (½=fixo, ¼=metade do fixo); demais, proporcional.
+  // Sem fixa: qualquer 'max' vale a mais cara; todas 'average', soma proporcional.
   // parts: [{price, fractionValue, mode, fixed}]
   priceFractionalPizza(parts){
-    const fixedCands = parts.filter(x=> x.mode==='fixed' && x.fixed>0).map(x=> x.fixed);
-    if(fixedCands.length) return Math.max(...fixedCands);
+    if(parts.some(x=> x.mode==='fixed' && x.fixed>0))
+      return parts.reduce((s,x)=> s + (x.mode==='fixed' && x.fixed>0 ? x.fixed * x.fractionValue/0.5 : x.price * x.fractionValue), 0);
     if(parts.some(x=> x.mode!=='average')) return Math.max(...parts.map(x=> x.price));
     return parts.reduce((s,x)=> s + x.price * x.fractionValue, 0);
   }
@@ -485,13 +487,16 @@ class StoreState {
       const prices = [basePrice, ...allFlavors.map(f=>{
         return catalogPrice(f);
       })];
-      // Regra por produto no fluxo combinado: fixo > mais cara > média
+      // Regra por produto no fluxo combinado: com parte fixa, soma as parcelas
+      // (fixa: fixo×(quota/0,5); demais: preço×quota); senão, mais cara ou média.
       const cfgOf = (typeof this.getProductFractionConfig==='function')
         ? (pid => this.getProductFractionConfig(pid, size?.id))
         : (() => ({ mode: 'max', fixed: null }));
       const parts = [product, ...allFlavors].map((p,i)=> ({ cfg: cfgOf(p.id), price: prices[i] }));
-      const fixedCands = parts.filter(x=> x.cfg.mode==='fixed' && x.cfg.fixed>0).map(x=> x.cfg.fixed);
-      if(fixedCands.length) basePrice = Math.max(...fixedCands);
+      if(parts.some(x=> x.cfg.mode==='fixed' && x.cfg.fixed>0)){
+        const share = 1/parts.length;
+        basePrice = parts.reduce((s,x)=> s + (x.cfg.mode==='fixed' && x.cfg.fixed>0 ? x.cfg.fixed*share/0.5 : x.price*share), 0);
+      }
       else if(parts.every(x=> x.cfg.mode==='average')) basePrice = prices.reduce((s,v)=> s+v, 0) / prices.length;
       else basePrice = Math.max(...prices);
       const names = [product.name, ...allFlavors.map(f=> f.name)];
