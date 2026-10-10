@@ -182,7 +182,8 @@ export function priceOrder(input, catalog) {
  if(type==='delivery'){
   if(!input.deliveryAddress?.street||!input.deliveryAddress?.number||!input.deliveryAddress?.neighborhood) fail('Endereço incompleto.');
   const active=neighborhoods.filter(n=>n.is_active!==false);
-  fee=active.length>1?money(active.find(n=>n.id===input.neighborhoodId)?.delivery_fee??fail('Selecione o bairro.')):money(store.default_delivery_fee||0);
+  const chosen=active.find(n=>n.id===input.neighborhoodId);
+  fee=active.length>1?money(chosen?.delivery_fee ?? chosen?.fee ?? fail('Selecione o bairro.')):money(store.default_delivery_fee||0);
  }
  const minimum=settings[type==='delivery'?'min_order_delivery':'min_order_pickup']??(type==='delivery'?store.min_order_value:0);
  if(subtotal<money(minimum||0)) fail('Pedido abaixo do valor mínimo.');

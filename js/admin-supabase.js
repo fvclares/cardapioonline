@@ -2426,7 +2426,7 @@ async function renderNeighborhoods(){
     <div class="admin-card" style="padding:0.85rem 1rem; margin-bottom:0.6rem; display:flex; justify-content:space-between; align-items:center; ${n.is_active===false?'opacity:0.6; border-style:dashed;':''}">
       <div>
         <div style="font-weight:800; font-size:0.95rem;">📍 ${n.name} ${n.is_active===false ? '<span class="badge badge-closed" style="margin-left:0.4rem;">Inativo</span>' : ''}</div>
-        <div style="font-size:0.82rem; color:var(--text-secondary);">Taxa: <strong style="color:var(--primary);">${formatCurrency(n.fee)}</strong> • ordem ${n.display_order||1}</div>
+        <div style="font-size:0.82rem; color:var(--text-secondary);">Taxa: <strong style="color:var(--primary);">${formatCurrency(n.delivery_fee ?? n.fee)}</strong> • ordem ${n.display_order||1}</div>
       </div>
       <div style="display:flex; gap:0.4rem;">
         <button class="btn btn-secondary btn-sm btn-edit-neighborhood" data-id="${n.id}">✏️</button>
@@ -2453,7 +2453,7 @@ function openNeighborhoodModal(id=null){
     neighborhoodsApi.list(currentStoreId).then(({data})=>{
       const n=data?.find(x=>x.id===id); if(!n) return;
       document.getElementById('neighborhoodNameInput').value=n.name||'';
-      document.getElementById('neighborhoodFeeInput').value=formatCurrencyInput(n.fee||0);
+      document.getElementById('neighborhoodFeeInput').value=formatCurrencyInput(n.delivery_fee ?? n.fee ?? 0);
       document.getElementById('neighborhoodOrderInput').value=n.display_order||1;
       document.getElementById('neighborhoodActiveInput').checked=n.is_active!==false;
     });
@@ -2477,7 +2477,7 @@ document.getElementById('neighborhoodForm')?.addEventListener('submit', async (e
   const id=document.getElementById('neighborhoodEditId').value;
   const payload={
     name: document.getElementById('neighborhoodNameInput').value.trim(),
-    fee: parseCurrency(document.getElementById('neighborhoodFeeInput').value)||0,
+    delivery_fee: parseCurrency(document.getElementById('neighborhoodFeeInput').value)||0,
     display_order: Number(document.getElementById('neighborhoodOrderInput').value)||1,
     is_active: document.getElementById('neighborhoodActiveInput').checked
   };

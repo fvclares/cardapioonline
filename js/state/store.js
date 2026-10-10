@@ -649,8 +649,8 @@ class StoreState {
     if (this.cart.orderType === 'pickup') return 0;
     const nbs = this.store?.neighborhoods || (window.storage?.getNeighborhoods?.() || []);
     // Regra: mostra seletor e cobra por bairro apenas se >1 bairro cadastrado; senão taxa padrão
-    if (nbs.length > 1 && this.cart.neighborhood && this.cart.neighborhood.delivery_fee != null) {
-      return Number(this.cart.neighborhood.delivery_fee);
+    if (nbs.length > 1 && this.cart.neighborhood && (this.cart.neighborhood.delivery_fee ?? this.cart.neighborhood.fee) != null) {
+      return Number(this.cart.neighborhood.delivery_fee ?? this.cart.neighborhood.fee);
     }
     return Number(this.store?.default_delivery_fee || 0);
   }

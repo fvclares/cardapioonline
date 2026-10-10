@@ -117,7 +117,7 @@ class SupabaseStorageEngine {
         if (mapped.crustGroups.length && !mapped.crusts) mapped.crusts = mapped.crustGroups[0];
         this._dataCache.addonGroups = mapped;
       }
-      this._dataCache.neighborhoods = (neighborhoodsResult.data || []).map(n=>({...n,fee:Number(n.delivery_fee)}));
+      this._dataCache.neighborhoods = (neighborhoodsResult.data || []).map(n=>({...n,fee:Number(n.delivery_fee ?? n.fee ?? 0)}));
       this._dataCache.settings = settingsResult.data || {};
       this._dataCache.pizzaSizes = pizzaSizesResult?.data || [];
       this._dataCache.productSizePrices = sizePricesResult?.data || [];
