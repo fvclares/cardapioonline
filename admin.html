@@ -298,15 +298,6 @@
               </div>
             </div>
 
-            <div style="margin-bottom:1.5rem; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius-md); padding:1rem;">
-              <label class="form-label" style="margin-bottom:0.5rem; display:block;">🍕 Modelo de precificação para pizzas fracionadas (½, ¼)</label>
-              <select id="fractionPricingModeInput" style="width:100%; max-width:520px;">
-                <option value="max">💎 Valor da maior pizza (padrão — cobra pelo sabor mais caro da pizza completa)</option>
-                <option value="proportional">⚖️ Proporcional (soma proporcional de cada metade — ½ + ½ = metade de cada preço)</option>
-              </select>
-
-            </div>
-
             <div class="form-grid form-grid-2" style="margin-bottom: 1.5rem;">
               <div class="form-group">
                 <label class="form-label">Logo da Loja</label>
@@ -719,6 +710,21 @@
               <input type="checkbox" id="prodHasExtrasInput" style="width: auto;" />
               Permite escolher Adicionais Extras (Bacon, Queijo extra, etc.)
             </label>
+          </div>
+
+          <div id="prodFractionPricingContainer" style="display:none; background: var(--bg-input); padding: 0.85rem; border-radius: var(--radius-md); border: 1px solid var(--border); margin-bottom: 1rem;">
+            <div class="form-label" style="margin-bottom: 0.5rem;">🍕 Quando esta pizza for dividida (½, ¼), cobrar:</div>
+            <select id="prodFractionModeInput" style="width:100%;">
+              <option value="max">💎 Valor da mais cara — a pizza completa vale o sabor mais caro</option>
+              <option value="average">⚖️ Média — soma proporcional (½ R$68 + ½ R$78 = R$73)</option>
+              <option value="fixed">🏷️ Valor específico — sempre este valor quando dividida</option>
+            </select>
+            <div id="prodFractionFixedGroup" style="display:none; margin-top:0.6rem;">
+              <label class="form-label">Valor específico da dividida (R$) *</label>
+              <input type="text" inputmode="decimal" placeholder="0,00" id="prodFractionFixedInput" />
+              <span class="form-help">Preço cheio da pizza quando este sabor participa de qualquer divisão.</span>
+            </div>
+            <span class="form-help">Se juntar sabores com regras diferentes, vale: fixo &gt; mais cara &gt; média.</span>
           </div>
 
           <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer;">

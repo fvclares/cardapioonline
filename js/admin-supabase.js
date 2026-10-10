@@ -699,14 +699,6 @@ async function loadStoreData() {
   statusText.textContent = isOpen ? 'Aberto' : 'Fechado';
   statusText.style.color = isOpen ? 'var(--status-open)' : 'var(--status-closed)';
 
-  // Modelo de precificação fracionada
-  const pricingEl = document.getElementById('fractionPricingModeInput');
-  if(pricingEl){
-    let mode = settings?.fraction_pricing_mode || 'max';
-    if(mode==='proporcional') mode='proportional';
-    pricingEl.value = (mode==='proportional' ? 'proportional' : 'max');
-  }
-
   // Live preview file (once)
   const logoInput = document.getElementById('storeLogoInput');
   const coverInput = document.getElementById('storeCoverInput');
@@ -737,6 +729,9 @@ async function loadStoreData() {
 
   // Atualiza link público
   updatePublicUrl(store.slug);
+
+  // Popula filtro de categorias + selects (sem isso o filtro fica só com "Todas as Categorias")
+  try { await updateCategoryDropdowns(); } catch(e){ console.warn('updateCategoryDropdowns falhou', e?.message); }
 
   // Garante assinatura trial até próximo dia 01
   try { await subscriptionsApi.ensure(currentStoreId); } catch(e){ console.warn('ensure subscription falhou', e.message); }
@@ -919,19 +914,12 @@ document.getElementById('storeSettingsForm').addEventListener('submit', async (e
     status: computedStatus
   };
 
-  const fractionPricingMode = document.getElementById('fractionPricingModeInput')?.value || 'max';
   showLoading(true);
   const { data, error } = await storeApi.update(currentStore.id, updates);
   let settingsError = null;
   if (!error) {
-    const { error: sErr } = await settingsApi.upsert(currentStoreId, { schedule, fraction_pricing_mode: fractionPricingMode });
+    const { error: sErr } = await settingsApi.upsert(currentStoreId, { schedule });
     settingsError = sErr;
-    if(sErr && sErr.message && sErr.message.includes('fraction_pricing_mode')){
-      console.warn('Coluna fraction_pricing_mode ainda não existe, salvando apenas schedule', sErr.message);
-      const { error: sErr2 } = await settingsApi.upsert(currentStoreId, { schedule });
-      settingsError = sErr2;
-      if(!sErr2) showToast('⚠️ Salvo sem modelo de precificação — rode fix-fraction-pricing.sql no Supabase', 'info');
-    }
   }
   showLoading(false);
   if(settingsError){
@@ -1074,20 +1062,41 @@ async function deleteCategory(catId) {
 // ============================================
 
 async function updateCategoryDropdowns() {
-  const { data } = await categoriesApi.list(currentStoreId);
-  const options = data?.map(c => `<option value="${c.id}">${c.name}</option>`).join('') || '';
+  const filterEl = document.getElementById('filterProductCategory');
+  const prodCatEl = document.getElementById('prodCategorySelect');
+  const prevFilter = filterEl?.value || '';
+  const prevProdCat = prodCatEl?.value || '';
+  const { data, error } = await categoriesApi.list(currentStoreId);
+  // Em erro, mantém as opções atuais (nunca apaga o filtro)
+  if (error) {
+    console.warn('Falha ao carregar categorias para o filtro:', error.message);
+    return;
+  }
+  const cats = data || [];
+  const options = cats.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
 
-  document.getElementById('filterProductCategory').innerHTML =
-    window.safeHTML(`<option value="">Todas as Categorias</option>` + options);
-  document.getElementById('prodCategorySelect').innerHTML = window.safeHTML(options);
+  if (filterEl) {
+    filterEl.innerHTML =
+      window.safeHTML(`<option value="">Todas as Categorias</option>` + options);
+    if (prevFilter && cats.some(c => c.id === prevFilter)) filterEl.value = prevFilter;
+  }
+  if (prodCatEl) {
+    prodCatEl.innerHTML = window.safeHTML(options);
+    if (prevProdCat && cats.some(c => c.id === prevProdCat)) prodCatEl.value = prevProdCat;
+  }
 }
 
 async function renderProducts() {
   const container = document.getElementById('productsListContainer');
-  const selectedCat = document.getElementById('filterProductCategory').value;
-  const searchQuery = document.getElementById('filterProductSearch').value.trim().toLowerCase();
+  const filterEl = document.getElementById('filterProductCategory');
+  const searchEl = document.getElementById('filterProductSearch');
+  const selectedCat = filterEl?.value || '';
+  const searchQuery = (searchEl?.value || '').trim().toLowerCase();
 
-  const { data, error } = await productsApi.listAdmin(currentStoreId);
+  const [{ data, error }, { data: cats }] = await Promise.all([
+    productsApi.listAdmin(currentStoreId),
+    categoriesApi.list(currentStoreId).catch(() => ({ data: null }))
+  ]);
 
   if (error) {
     container.innerHTML = window.safeHTML(`<p style="color: var(--status-closed);">Erro: ${error.message}</p>`);
@@ -1111,10 +1120,18 @@ async function renderProducts() {
     return;
   }
 
-  container.innerHTML = window.safeHTML(filtered.map(prod => {
-    const catName = prod.categories?.name || 'Sem categoria';
+  const rowHtml = (prod) => {
+    const catName = prod.categories?.name || (cats||[]).find(c => c.id === prod.category_id)?.name || 'Sem categoria';
     const codigoStr = prod.codigo ? String(prod.codigo).padStart(3,'0') : '—';
     const featuredBadge = prod.is_featured ? `<span style="background:linear-gradient(135deg,#ff8c00,#ffb800); color:#000; font-size:0.68rem; font-weight:800; padding:0.15rem 0.4rem; border-radius:999px; margin-left:0.35rem;">⭐ #${prod.featured_order||1} Carrossel</span>` : '';
+    let fracBadge = '';
+    if(prod.is_pizza){
+      const fm = prod.fraction_pricing_mode==='fixed' ? 'fixed' : (prod.fraction_pricing_mode==='average'||prod.fraction_pricing_mode==='proportional'||prod.fraction_pricing_mode==='proporcional' ? 'average' : 'max');
+      const label = fm==='fixed'
+        ? `🏷️ Dividida: R$${Number(prod.fraction_fixed_price||0).toFixed(2).replace('.',',')}`
+        : fm==='average' ? '⚖️ Dividida: média' : '💎 Dividida: mais cara';
+      fracBadge = `<span style="font-size:0.72rem; color:var(--text-muted); font-weight:600;"> • ${label}</span>`;
+    }
     return `
       <div class="item-row" ${prod.is_featured ? 'style="border-color:rgba(255,184,0,0.35); background: linear-gradient(135deg, rgba(255,184,0,0.08), transparent);"' : ''}>
         <div class="item-main">
@@ -1126,6 +1143,7 @@ async function renderProducts() {
               <strong style="color: var(--secondary);">${formatCurrency(prod.base_price)}</strong>
               ${prod.has_crusts ? ' • Borda' : ''}
               ${prod.has_extras ? ' • Extras' : ''}
+              ${fracBadge}
             </div>
           </div>
         </div>
@@ -1135,7 +1153,33 @@ async function renderProducts() {
         </div>
       </div>
     `;
-  }).join(''));
+  };
+
+  // Agrupa por categoria (ordem do cadastro; "Sem categoria" por último)
+  const catOrder = new Map((cats||[]).map((c,i)=>[c.id,i]));
+  const groups = new Map();
+  for (const prod of filtered) {
+    const key = prod.category_id || '__none';
+    if (!groups.has(key)) {
+      const found = (cats||[]).find(c => c.id === prod.category_id);
+      groups.set(key, { name: prod.categories?.name || found?.name || 'Sem categoria', items: [] });
+    }
+    groups.get(key).items.push(prod);
+  }
+  const ordered = [...groups.entries()].sort((a,b)=>{
+    const oa = a[0]==='__none' ? Number.MAX_SAFE_INTEGER : (catOrder.get(a[0]) ?? Number.MAX_SAFE_INTEGER);
+    const ob = b[0]==='__none' ? Number.MAX_SAFE_INTEGER : (catOrder.get(b[0]) ?? Number.MAX_SAFE_INTEGER);
+    return oa - ob;
+  });
+
+  container.innerHTML = window.safeHTML(ordered.map(([ , g]) => `
+    <div style="margin:1rem 0 0.5rem; display:flex; align-items:center; gap:0.5rem;">
+      <span style="font-weight:800; font-size:0.95rem;">📂 ${g.name}</span>
+      <span class="badge badge-primary">${g.items.length} ${g.items.length===1?'item':'itens'}</span>
+      <span style="flex:1; height:1px; background:var(--border);"></span>
+    </div>
+    ${g.items.map(rowHtml).join('')}
+  `).join(''));
 
   container.querySelectorAll('.btn-edit-prod').forEach(btn =>
     btn.addEventListener('click', () => openProductModal(btn.dataset.id))
@@ -1179,7 +1223,27 @@ async function openProductModal(prodId = null) {
   const featuredGroup = document.getElementById('featuredOrderGroup');
   const previewContainer = document.getElementById('prodImagePreview');
   const priceContainer = document.getElementById('prodSizePricesContainer');
+  const fracContainer = document.getElementById('prodFractionPricingContainer');
+  const fracModeInput = document.getElementById('prodFractionModeInput');
+  const fracFixedGroup = document.getElementById('prodFractionFixedGroup');
+  const fracFixedInput = document.getElementById('prodFractionFixedInput');
   const modal = document.getElementById('productModalBackdrop');
+
+  function normFractionMode(v){
+    if(v==='proportional'||v==='proporcional') return 'average';
+    if(v==='average'||v==='fixed'||v==='max') return v;
+    return 'max';
+  }
+  function syncFractionUI(){
+    const isPizza = isPizzaInput.checked;
+    if(fracContainer) fracContainer.style.display = isPizza ? 'block' : 'none';
+    if(fracFixedGroup) fracFixedGroup.style.display = (isPizza && fracModeInput?.value==='fixed') ? 'block' : 'none';
+  }
+  if(fracModeInput && !fracModeInput._bound){
+    fracModeInput._bound = true;
+    fracModeInput.addEventListener('change', syncFractionUI);
+  }
+  if(fracFixedInput) attachCurrencyMask(fracFixedInput);
 
   function syncFeaturedUI(){
     if (featuredGroup) featuredGroup.style.display = featuredInput.checked ? 'flex' : 'none';
@@ -1206,7 +1270,7 @@ async function openProductModal(prodId = null) {
   };
   attachCurrencyMask(priceInput);
 
-  updateCategoryDropdowns();
+  await updateCategoryDropdowns();
 
   if (prodId) {
     titleEl.textContent = 'Editar Produto';
@@ -1226,6 +1290,9 @@ async function openProductModal(prodId = null) {
       crustsInput.checked = !!prod.has_crusts;
       extrasInput.checked = !!prod.has_extras;
       availInput.checked = prod.available !== false;
+      if(fracModeInput) fracModeInput.value = normFractionMode(prod.fraction_pricing_mode);
+      if(fracFixedInput) fracFixedInput.value = prod.fraction_fixed_price != null ? formatCurrencyInput(prod.fraction_fixed_price) : formatCurrencyInput(0);
+      syncFractionUI();
       featuredInput.checked = !!prod.is_featured;
       featuredOrderInput.value = String(prod.featured_order || 1);
       syncFeaturedUI();
@@ -1273,6 +1340,9 @@ async function openProductModal(prodId = null) {
     crustsInput.checked = true;
     extrasInput.checked = true;
     availInput.checked = true;
+    if(fracModeInput) fracModeInput.value = 'max';
+    if(fracFixedInput) fracFixedInput.value = formatCurrencyInput(0);
+    syncFractionUI();
     featuredInput.checked = false;
     featuredOrderInput.value = '1';
     syncFeaturedUI();
@@ -1305,6 +1375,7 @@ async function openProductModal(prodId = null) {
       priceContainer.style.display = 'none';
       document.getElementById('prodPriceInput').parentElement.style.display='block';
     }
+    syncFractionUI();
   };
 
   imgInput.onchange = (e) => {
@@ -1396,6 +1467,19 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
     }
   }
   // Se pizza e tem tamanhos, base_price será o menor preço por tamanho (fallback)
+  // Precificação fracionada por produto: média | mais cara | valor fixo
+  let fracMode = document.getElementById('prodFractionModeInput')?.value || 'max';
+  if(fracMode==='proportional'||fracMode==='proporcional') fracMode='average';
+  if(!['max','average','fixed'].includes(fracMode)) fracMode='max';
+  let fracFixed = null;
+  if(isPizza && fracMode==='fixed'){
+    fracFixed = parseCurrency(document.getElementById('prodFractionFixedInput')?.value) || 0;
+    if(!(fracFixed>0) || fracFixed>99999999.99){
+      showToast('Informe o valor específico da dividida (maior que zero).', 'error');
+      document.getElementById('prodFractionFixedInput')?.focus();
+      return;
+    }
+  }
   const productData = {
     codigo: codigoVal,
     name: document.getElementById('prodNameInput').value.trim(),
@@ -1408,13 +1492,28 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
     has_extras: document.getElementById('prodHasExtrasInput').checked,
     available: document.getElementById('prodAvailableInput').checked,
     is_featured: wantFeatured,
-    featured_order: Number(document.getElementById('prodFeaturedOrderInput').value) || 1
+    featured_order: Number(document.getElementById('prodFeaturedOrderInput').value) || 1,
+    fraction_pricing_mode: isPizza ? fracMode : 'max',
+    fraction_fixed_price: isPizza && fracMode==='fixed' ? fracFixed : null
   };
 
   showLoading(true);
   try {
-    const {error}=await supabase.rpc('save_product_with_prices',{p_store_id:currentStoreId,p_product_id:id||null,p_product:productData,p_prices:validation.prices});
+    const {data: saved, error}=await supabase.rpc('save_product_with_prices',{p_store_id:currentStoreId,p_product_id:id||null,p_product:productData,p_prices:validation.prices});
     if(error)throw error;
+    // Compat: RPC antigo ignora os campos novos — tenta update direto (falha silenciosa pré-migration com aviso)
+    const savedId = saved?.id || id || null;
+    if(savedId && isPizza){
+      try {
+        const { error: fracErr } = await productsApi.update(savedId, { fraction_pricing_mode: fracMode, fraction_fixed_price: fracMode==='fixed' ? fracFixed : null });
+        if(fracErr && /fraction/i.test(fracErr.message||'')){
+          console.warn('Colunas de precificação fracionada ainda não existem:', fracErr.message);
+          showToast('⚠️ Produto salvo, mas sem regra da dividida — rode a migration product_fraction_pricing no Supabase', 'info');
+        }
+      } catch(fracEx){
+        console.warn('Fallback precificação fracionada falhou', fracEx?.message);
+      }
+    }
     closeProductModal();await renderProducts();showToast('✅ Produto e preços salvos!','success');
   } catch(error){
     document.getElementById('prodSizePricesError').textContent='Não foi possível salvar: '+error.message;
@@ -1730,7 +1829,7 @@ navItems.forEach(item => {
     pageTitle.textContent = tabTitles[tabId] || 'Painel';
 
     if (tabId === 'tab-categories') renderCategories();
-    if (tabId === 'tab-products') renderProducts();
+    if (tabId === 'tab-products') { updateCategoryDropdowns().finally(() => renderProducts()); }
     if (tabId === 'tab-orders') renderOrders();
     if (tabId === 'tab-sizes') renderPizzaSizes();
     if (tabId === 'tab-addons') renderAddons();

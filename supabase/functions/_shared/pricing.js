@@ -19,7 +19,32 @@ export function priceOrder(input, catalog) {
   if(cents<=0) fail('Preço inválido para o tamanho da pizza.');
   return cents;
  };
- const mode=settings.fraction_pricing_mode==='proportional'?'proportional':'max';
+ const normFractionMode=value=>{
+  if(value==='proportional'||value==='proporcional'||value==='average') return 'average';
+  if(value==='fixed') return 'fixed';
+  return 'max';
+ };
+ // Regra por produto com fallback para o modelo global antigo (pré-migration)
+ const globalFallback=settings.fraction_pricing_mode==='proportional'||settings.fraction_pricing_mode==='proporcional'||settings.fraction_pricing_mode==='average'?'average':'max';
+ const productFractionConfig=p=>{
+  const raw=p?.fraction_pricing_mode;
+  let mode=raw?normFractionMode(raw):globalFallback;
+  let fixedCents=null;
+  if(p?.fraction_fixed_price!=null){
+   const n=Number(p.fraction_fixed_price);
+   if(Number.isFinite(n)&&n>0) fixedCents=money(n);
+  }
+  if(mode==='fixed'&&fixedCents==null) mode='max';
+  return {mode,fixedCents};
+ };
+ // parts: [{unit (cents), units (12-based), mode, fixedCents}]
+ const priceFractionalPizzaCents=parts=>{
+  const fixedCands=parts.filter(x=>x.mode==='fixed'&&x.fixedCents!=null).map(x=>x.fixedCents);
+  if(fixedCands.length) return Math.max(...fixedCands);
+  if(parts.some(x=>x.mode!=='average')) return Math.max(...parts.map(x=>x.unit));
+  // média = soma proporcional
+  return parts.reduce((s,x)=>s+Math.round(x.unit*x.units/12),0);
+ };
  const fractionGroups=new Map();
  const offerCounts=new Map();
  const items=input.items.map(raw=>{
@@ -51,7 +76,18 @@ export function priceOrder(input, catalog) {
   const flavorIds=raw.flavorIds||[];
   if(!Array.isArray(flavorIds)||flavorIds.length>3||flavorIds.length>(size?.max_flavors||1)-1) fail('Sabores inválidos.');
   const flavors=flavorIds.map(id=>{const f=product(id);if(!f.is_pizza) fail('Sabor inválido.');return f;});
-  let unit=Math.max(price(p,size),...flavors.map(f=>price(f,size)));
+  // Pizza inteira combinada (legado): fixo > mais cara > média
+  let unit;
+  if(flavors.length){
+   const allP=[p,...flavors];
+   const cfgs=allP.map(productFractionConfig);
+   const fixedCands=cfgs.filter(c=>c.mode==='fixed'&&c.fixedCents!=null).map(c=>c.fixedCents);
+   if(fixedCands.length) unit=Math.max(...fixedCands);
+   else if(cfgs.every(c=>c.mode==='average')){
+    const sumCents=[p,...flavors].map(f=>price(f,size)).reduce((s,v)=>s+v,0);
+    unit=Math.round(sumCents/allP.length);
+   } else unit=Math.max(price(p,size),...flavors.map(f=>price(f,size)));
+  } else unit=price(p,size);
   const addon=(selection,kind)=>{
    if(!selection) return null;
    const a=addons.find(a=>a.id===selection.id);
@@ -106,15 +142,15 @@ export function priceOrder(input, catalog) {
   const item={productId:p.id,productName:label+[p.name,...flavors.map(f=>f.name)].join(' + ')+(size?' ['+size.name+']':''),productCodigo:p.codigo,
    size:size?{id:size.id,name:size.name}:null,flavorIds,quantity:qty,fractionValue:fraction,unitPrice:unit/100,crust,extras,observation,itemTotal:Math.round(unit*qty*fraction)/100};
   if(denominator>1){
+   const cfg=productFractionConfig(p);
    const entries=fractionGroups.get(size.id)||[];
-   for(let i=0;i<qty;i++) entries.push({item,unit,units:12/denominator});
+   for(let i=0;i<qty;i++) entries.push({item,unit,units:12/denominator,mode:cfg.mode,fixedCents:cfg.fixedCents});
    fractionGroups.set(size.id,entries);
   }
   return item;
  });
  for(const entries of fractionGroups.values()){
   if(entries.reduce((s,e)=>s+e.units,0)%12!==0) fail('Complete as pizzas fracionadas.');
-  if(mode==='proportional') continue;
   entries.forEach(e=>e.item.itemTotal=0);
   const remaining=entries.slice().sort((a,b)=>b.unit-a.unit);
   while(remaining.length){
@@ -124,8 +160,10 @@ export function priceOrder(input, catalog) {
     if(index<0) fail('Combinação de frações inválida.');
     const [part]=remaining.splice(index,1);pizza.push(part);units+=part.units;
    }
-   const highest=Math.max(...pizza.map(e=>e.unit));let assigned=0;
-   pizza.forEach((e,i)=>{const cents=i===pizza.length-1?highest-assigned:Math.round(highest*e.units/12);assigned+=cents;e.item.itemTotal+=cents/100;});
+   // Regra da pizza: fixo > mais cara > média (por produto)
+   const whole=priceFractionalPizzaCents(pizza);
+   let assigned=0;
+   pizza.forEach((e,i)=>{const cents=i===pizza.length-1?whole-assigned:Math.round(whole*e.units/12);assigned+=cents;e.item.itemTotal+=cents/100;});
   }
  }
  const subtotal=items.reduce((s,i)=>s+money(i.itemTotal),0);

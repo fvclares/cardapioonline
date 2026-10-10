@@ -108,15 +108,47 @@ class StoreState {
   }
 
   getFractionPricingMode(){
-    // Le de store_settings.fraction_pricing_mode, fallback stores.settings json ou 'max'
+    // Compat: modelo global antigo (store_settings.fraction_pricing_mode).
+    // A regra agora é por produto; este getter serve só de fallback para
+    // produtos sem configuração (pré-migration).
     const s = this.settings || (window.storage?.getSettings?.() || {});
     let mode = s.fraction_pricing_mode || s.fractionPricingMode || s.settings?.fraction_pricing_mode;
     // fallback para stores.settings jsonb
     if(!mode && this.store?.settings?.fraction_pricing_mode) mode = this.store.settings.fraction_pricing_mode;
     if(!mode && this.store?.settings?.fractionPricingMode) mode = this.store.settings.fractionPricingMode;
-    if(mode === 'proporcional') mode = 'proportional';
-    if(mode === 'proportional' || mode === 'proporcional') return 'proportional';
+    if(mode === 'proporcional' || mode === 'proportional' || mode === 'average') return 'proportional';
     return 'max'; // default: maior pizza
+  }
+
+  normalizeFractionMode(v){
+    if(v==='proportional'||v==='proporcional'||v==='average') return 'average';
+    if(v==='fixed') return 'fixed';
+    return 'max';
+  }
+
+  getProductFractionConfig(productId){
+    const p = (this.products||[]).find(x=> x.id===productId) || null;
+    let mode = p ? this.normalizeFractionMode(p.fraction_pricing_mode) : null;
+    let fixed = p && p.fraction_fixed_price!=null ? Number(p.fraction_fixed_price) : null;
+    if(!(fixed>0)) fixed = null;
+    if(!mode){
+      // fallback global antigo para produtos sem coluna (pré-migration)
+      mode = this.getFractionPricingMode()==='proportional' ? 'average' : 'max';
+    }
+    if(mode==='fixed' && !(fixed>0)){
+      mode = 'max';
+    }
+    return { mode, fixed };
+  }
+
+  // Preço de uma pizza completa fracionada a partir das partes:
+  // prioridade: fixo > mais cara > média (proporcional).
+  // parts: [{price, fractionValue, mode, fixed}]
+  priceFractionalPizza(parts){
+    const fixedCands = parts.filter(x=> x.mode==='fixed' && x.fixed>0).map(x=> x.fixed);
+    if(fixedCands.length) return Math.max(...fixedCands);
+    if(parts.some(x=> x.mode!=='average')) return Math.max(...parts.map(x=> x.price));
+    return parts.reduce((s,x)=> s + x.price * x.fractionValue, 0);
   }
 
   // Refresh assíncrono (busca do Supabase)
@@ -295,21 +327,8 @@ class StoreState {
     return { valid: errors.length===0, errors, groups };
   }
   _computeFractionalSubtotal(){
-    const mode = this.getFractionPricingMode(); // 'max' ou 'proportional'
-    // Proporcional: soma simples proporcional (cada metade vale metade do preço)
-    if(mode === 'proportional'){
-      let total=0;
-      for(const item of this.cart.items){
-        const fv = (item.fractionValue!=null) ? Number(item.fractionValue) : 1;
-        const qty = Number(item.quantity||1);
-        const base = Number(item.basePrice!=null ? item.basePrice : item.unitPrice);
-        const effectivePrice = base + (item.crust?Number(item.crust.price||0):0) + (item.extras?item.extras.reduce((s,e)=>s+Number(e.price||0),0):0);
-        if(fv===1) total += effectivePrice * qty;
-        else total += effectivePrice * fv * qty;
-      }
-      return total;
-    }
-    // Max: cada pizza completa (1.0) custa o max entre seus pedaços
+    // Regra por produto (fixo > mais cara > média). Cada pizza completa (soma 1.0)
+    // do mesmo tamanho usa a regra das partes que a compõem.
     const fractionalBySize={};
     let wholeSubtotal=0;
     for(const item of this.cart.items){
@@ -322,7 +341,22 @@ class StoreState {
       } else {
         const key = item.size?.id || item.size?.name || 'sem-tamanho';
         if(!fractionalBySize[key]) fractionalBySize[key]=[];
-        for(let i=0;i<qty;i++) fractionalBySize[key].push({ price: effectivePrice, item });
+        for(let i=0;i<qty;i++){
+          let mode = item.fractionMode || null;
+          let fixed = item.fractionFixed!=null ? Number(item.fractionFixed) : null;
+          const norm = (typeof this.normalizeFractionMode==='function') ? this.normalizeFractionMode.bind(this) : (v=> v==='fixed' ? 'fixed' : 'max');
+          if(!mode){
+            if(typeof this.getProductFractionConfig==='function'){
+              const cfg = this.getProductFractionConfig(item.productId);
+              mode = cfg.mode; fixed = cfg.fixed;
+            } else { mode = 'max'; fixed = null; }
+          } else {
+            mode = norm(mode);
+            if(!(fixed>0)) fixed = null;
+            if(mode==='fixed' && !(fixed>0)) mode='max';
+          }
+          fractionalBySize[key].push({ price: effectivePrice, item, fractionValue: fv, mode, fixed });
+        }
       }
     }
     let fracSubtotal=0;
@@ -331,23 +365,21 @@ class StoreState {
       let idx=0;
       while(idx < list.length){
         let sum=0;
-        let maxPrice=0;
+        const pizza=[];
         while(idx < list.length && sum < 0.999){
           const need = 1 - sum;
           const entry = list[idx];
-          const fv = (entry.item.fractionValue!=null) ? Number(entry.item.fractionValue) : 1;
-          if(fv <= need + 0.001){
-            sum += fv;
-            if(entry.price > maxPrice) maxPrice = entry.price;
+          if(entry.fractionValue <= need + 0.001){
+            sum += entry.fractionValue;
+            pizza.push(entry);
             idx++;
           } else {
             let found=false;
             for(let j=idx+1;j<list.length;j++){
               const e2=list[j];
-              const fv2=(e2.item.fractionValue!=null)?Number(e2.item.fractionValue):1;
-              if(fv2 <= need + 0.001){
-                sum+=fv2;
-                if(e2.price>maxPrice) maxPrice=e2.price;
+              if(e2.fractionValue <= need + 0.001){
+                sum+=e2.fractionValue;
+                pizza.push(e2);
                 list.splice(j,1);
                 found=true;
                 break;
@@ -356,10 +388,14 @@ class StoreState {
             if(!found) break;
           }
         }
-        if(Math.abs(sum-1) < 0.01){
-          fracSubtotal += maxPrice;
-        } else if(sum>0.001){
-          fracSubtotal += maxPrice * sum;
+        if(pizza.length && Math.abs(sum-1) < 0.01){
+          const priceWhole = (typeof this.priceFractionalPizza==='function')
+            ? this.priceFractionalPizza(pizza)
+            : Math.max(...pizza.map(x=> x.price));
+          fracSubtotal += priceWhole;
+        } else if(pizza.length && sum>0.001){
+          // grupo incompleto: exibe proporcional (validação bloqueia o checkout)
+          fracSubtotal += pizza.reduce((s,e)=> s + e.price * e.fractionValue, 0);
         }
       }
     }
@@ -403,6 +439,9 @@ class StoreState {
       const sizeShort = size && size.name ? size.name.split('(')[0].trim() : '';
       const displayName = `${label} ${product.name.replace('Pizza ','')}` + (sizeShort ? ` [${sizeShort}]` : '');
 
+      const fracCfg = (typeof this.getProductFractionConfig==='function')
+        ? this.getProductFractionConfig(product.id)
+        : { mode: 'max', fixed: null };
       const cartItem = {
         id: 'cart_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
         productId: product.id,
@@ -416,6 +455,8 @@ class StoreState {
         fraction: { label, numerator: fraction.numerator||1, denominator: fraction.denominator||2 },
         fractionValue: fv,
         fractionLabel: label,
+        fractionMode: fracCfg.mode,
+        fractionFixed: fracCfg.fixed,
         crust: crust ? { id: crust.id, name: crust.name, price: Number(crust.price || 0) } : null,
         extras: extras.map(e => ({ id: e.id, name: e.name, price: Number(e.price || 0)*Number(e.quantity||1), quantity: Number(e.quantity||1), groupId: e.groupId || null })),
         observation: observation.trim(),
@@ -438,7 +479,15 @@ class StoreState {
       const prices = [basePrice, ...allFlavors.map(f=>{
         return catalogPrice(f);
       })];
-      basePrice = Math.max(...prices);
+      // Regra por produto no fluxo combinado: fixo > mais cara > média
+      const cfgOf = (typeof this.getProductFractionConfig==='function')
+        ? (pid => this.getProductFractionConfig(pid))
+        : (() => ({ mode: 'max', fixed: null }));
+      const parts = [product, ...allFlavors].map((p,i)=> ({ cfg: cfgOf(p.id), price: prices[i] }));
+      const fixedCands = parts.filter(x=> x.cfg.mode==='fixed' && x.cfg.fixed>0).map(x=> x.cfg.fixed);
+      if(fixedCands.length) basePrice = Math.max(...fixedCands);
+      else if(parts.every(x=> x.cfg.mode==='average')) basePrice = prices.reduce((s,v)=> s+v, 0) / prices.length;
+      else basePrice = Math.max(...prices);
       const names = [product.name, ...allFlavors.map(f=> f.name)];
       // Monta nome com frações
       if (allFlavors.length===1) displayName = `Pizza ½ ${names[0].replace('Pizza ','')} + ½ ${names[1].replace('Pizza ','')}`;
