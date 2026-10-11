@@ -56,7 +56,9 @@ function renderHeader(container) {
               📍 ${store.address || 'São Paulo - SP'}
             </span>
             <span class="store-detail-item">
-              🛵 Entrega a partir de ${cs ? cs.formatCurrency(store.default_delivery_fee || 7) : 'R$ 7,00'}
+              ${store.settings?.delivery_fee_by_store
+                ? '🛵 Entrega: taxa informada pela loja'
+                : `🛵 Entrega a partir de ${cs ? cs.formatCurrency(store.default_delivery_fee || 7) : 'R$ 7,00'}`}
             </span>
           </div>
 

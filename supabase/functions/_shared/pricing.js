@@ -184,13 +184,19 @@ export function priceOrder(input, catalog) {
  const type=input.orderType;
  if(!['pickup','delivery'].includes(type)) fail('Tipo de pedido inválido.');
  if(settings[type==='pickup'?'allow_pickup':'allow_delivery']===false) fail('Modalidade indisponível.');
- let fee=0;
- if(type==='delivery'){
-  if(!input.deliveryAddress?.street||!input.deliveryAddress?.number||!input.deliveryAddress?.neighborhood) fail('Endereço incompleto.');
-  const active=neighborhoods.filter(n=>n.is_active!==false);
-  const chosen=active.find(n=>n.id===input.neighborhoodId);
-  fee=active.length>1?money(chosen?.delivery_fee ?? chosen?.fee ?? fail('Selecione o bairro.')):money(store.default_delivery_fee||0);
- }
+  let fee=0; let feePending=false;
+  if(type==='delivery'){
+   if(!input.deliveryAddress?.street||!input.deliveryAddress?.number||!input.deliveryAddress?.neighborhood) fail('Endereço incompleto.');
+   const byStore=!!(store.settings && store.settings.delivery_fee_by_store);
+   const active=neighborhoods.filter(n=>n.is_active!==false);
+   if(byStore){
+    // Taxa definida pela loja: pedido sem valor de taxa (servidor é autoritativo)
+    feePending=true; fee=0;
+   } else if(active.length>1){
+    const chosen=active.find(n=>n.id===input.neighborhoodId);
+    fee=money(chosen?.delivery_fee ?? chosen?.fee ?? fail('Selecione o bairro.'));
+   } else fee=money(store.default_delivery_fee||0);
+  }
  const minimum=settings[type==='delivery'?'min_order_delivery':'min_order_pickup']??(type==='delivery'?store.min_order_value:0);
  if(subtotal<money(minimum||0)) fail('Pedido abaixo do valor mínimo.');
  const method=input.payment?.method;
@@ -198,6 +204,6 @@ export function priceOrder(input, catalog) {
  if(!Number.isFinite(subtotal+fee)||subtotal<0||fee<0) fail('Preço inválido no catálogo.');
  const name=String(input.customer?.name||'').trim();const phone=String(input.customer?.phone||'').replace(/\D/g,'');
  if(name.length<2||name.length>120||phone.length<10||phone.length>15) fail('Dados do cliente inválidos.');
- return {storeId:store.id,storeName:store.name,storePhone:store.phone,orderType:type,customer:{name,phone},deliveryAddress:type==='delivery'?input.deliveryAddress:null,
-  payment:{method,cashChange:method==='cash'?Number(input.payment.cashChange)||null:null},items,subtotal:subtotal/100,deliveryFee:fee/100,total:(subtotal+fee)/100,notes:String(input.notes||'').slice(0,1000)};
+  return {storeId:store.id,storeName:store.name,storePhone:store.phone,orderType:type,customer:{name,phone},deliveryAddress:type==='delivery'?input.deliveryAddress:null,
+   payment:{method,cashChange:method==='cash'?Number(input.payment.cashChange)||null:null},items,subtotal:subtotal/100,deliveryFee:fee/100,deliveryFeePending:feePending,total:(subtotal+fee)/100,notes:String(input.notes||'').slice(0,1000)};
 }

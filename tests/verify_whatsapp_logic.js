@@ -88,6 +88,23 @@ function testWhatsAppFormatting() {
     console.error('❌ FAIL: Alguma validação de formato falhou.');
     process.exit(1);
   }
+
+  // Taxa definida pela loja: sem valor, só aviso + total parcial
+  const pendingOrder = { ...mockOrder, deliveryFee: 0, deliveryFeePending: true, total: 70.00 };
+  const pendingMsg = whatsappService.formatOrderMessage(pendingOrder);
+  const checks = [
+    pendingMsg.includes('a ser informada pela loja'),
+    pendingMsg.includes('TOTAL PARCIAL'),
+    pendingMsg.includes('70,00'),
+    !pendingMsg.includes('TOTAL A PAGAR'),
+  ];
+  if (checks.every(Boolean)) {
+    console.log('✅ PASS: Mensagem com taxa a combinar correta!');
+  } else {
+    console.error('❌ FAIL: Mensagem de taxa a combinar incorreta.');
+    console.error(pendingMsg);
+    process.exit(1);
+  }
 }
 
 testWhatsAppFormatting();

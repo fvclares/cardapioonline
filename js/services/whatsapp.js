@@ -94,9 +94,14 @@ const whatsappService = {
     lines.push(`*RESUMO DO PEDIDO:*`);
     lines.push(`Subtotal: ${cs ? cs.formatCurrency(order.subtotal) : 'R$ ' + order.subtotal}`);
     if (order.orderType === 'delivery') {
-      lines.push(`Taxa de Entrega: ${cs ? cs.formatCurrency(order.deliveryFee) : 'R$ ' + order.deliveryFee}`);
+      if (order.deliveryFeePending) {
+        lines.push(`Taxa de Entrega: 🏪 a ser informada pela loja`);
+      } else {
+        lines.push(`Taxa de Entrega: ${cs ? cs.formatCurrency(order.deliveryFee) : 'R$ ' + order.deliveryFee}`);
+      }
     }
-    lines.push(`*TOTAL A PAGAR: ${cs ? cs.formatCurrency(order.total) : 'R$ ' + order.total}*`);
+    lines.push(`*TOTAL ${order.deliveryFeePending ? 'PARCIAL' : 'A PAGAR'}: ${cs ? cs.formatCurrency(order.total) : 'R$ ' + order.total}*`);
+    if (order.deliveryFeePending) lines.push(`_Parcial sem a taxa — a loja informará o valor final._`);
     lines.push(`────────────────────────`);
     lines.push(`_Pedido gerado via ZapMenu_`);
 

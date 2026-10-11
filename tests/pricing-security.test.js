@@ -139,6 +139,19 @@ test('normal delivery adds server fee',()=>{
  const o=order();o.orderType='delivery';o.deliveryFee=0;o.deliveryAddress={street:'Rua',number:'1',neighborhood:'Centro'};
  assert.equal(priceOrder(o,catalog()).total,65);
 });
+test('store-defined fee: delivery pending, total equals subtotal',()=>{
+ const c=catalog();c.store.settings={delivery_fee_by_store:true};
+ const o=order();o.orderType='delivery';o.deliveryAddress={street:'Rua',number:'1',neighborhood:'Centro'};
+ const r=priceOrder(o,c);
+ assert.equal(r.deliveryFee,0);
+ assert.equal(r.deliveryFeePending,true);
+ assert.equal(r.total,r.subtotal);
+ assert.equal(r.total,60);
+});
+test('pending fee only when store allows (server authoritative)',()=>{
+ const r=priceOrder(order(),catalog());
+ assert.equal(r.deliveryFeePending,false);
+});
 test('monetary arithmetic uses cents for valid two-decimal prices',()=>{
  const c=catalog();c.products[2].base_price=0.29;
  assert.equal(priceOrder(order([{productId:'drink',quantity:3}]),c).total,0.87);

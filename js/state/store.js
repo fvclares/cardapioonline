@@ -655,8 +655,14 @@ class StoreState {
     return this.cart.items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
   }
 
+  // Taxa definida pela loja: pedido sem valor de taxa (loja informa depois)
+  isDeliveryFeeByStore(){
+    return !!this.store?.settings?.delivery_fee_by_store;
+  }
+
   getDeliveryFee() {
     if (this.cart.orderType === 'pickup') return 0;
+    if (this.isDeliveryFeeByStore()) return null;
     const nbs = this.store?.neighborhoods || (window.storage?.getNeighborhoods?.() || []);
     // Regra: mostra seletor e cobra por bairro apenas se >1 bairro cadastrado; senão taxa padrão
     if (nbs.length > 1 && this.cart.neighborhood && (this.cart.neighborhood.delivery_fee ?? this.cart.neighborhood.fee) != null) {
@@ -666,7 +672,14 @@ class StoreState {
   }
 
   getTotal() {
-    return this.getSubtotal() + this.getDeliveryFee();
+    const fee = this.getDeliveryFee();
+    return this.getSubtotal() + (fee == null ? 0 : fee);
+  }
+
+  // Texto de apoio quando o total é parcial (taxa a combinar com a loja)
+  getTotalNote() {
+    if (this.cart.orderType === 'delivery' && this.isDeliveryFeeByStore()) return '+ taxa de entrega a combinar com a loja';
+    return '';
   }
 
   getItemCount() {

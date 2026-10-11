@@ -681,6 +681,17 @@ async function loadStoreData() {
   if (obsEl) obsEl.value = store.description || store.observations || '';
   document.getElementById('storeDeliveryFeeInput').value = formatCurrencyInput(store.default_delivery_fee ?? 7.00);
   document.getElementById('storeMinOrderInput').value = formatCurrencyInput(store.min_order_value ?? 35.00);
+  const feeByStoreEl = document.getElementById('storeFeeByStoreInput');
+  if(feeByStoreEl){
+    feeByStoreEl.checked = !!(store.settings && store.settings.delivery_fee_by_store);
+    document.getElementById('storeDeliveryFeeInput').disabled = feeByStoreEl.checked;
+    if(!feeByStoreEl._bound){
+      feeByStoreEl._bound = true;
+      feeByStoreEl.addEventListener('change', ()=>{
+        document.getElementById('storeDeliveryFeeInput').disabled = feeByStoreEl.checked;
+      });
+    }
+  }
   document.getElementById('storeLogoCurrentUrl').value = store.logo_url || '';
   document.getElementById('storeCoverCurrentUrl').value = store.cover_url || '';
   document.getElementById('storeLogoInput').value = '';
@@ -900,6 +911,7 @@ document.getElementById('storeSettingsForm').addEventListener('submit', async (e
   const openingHoursText = scheduleToText(schedule);
   document.getElementById('storeHoursInput').value = openingHoursText;
 
+  const feeByStore = !!document.getElementById('storeFeeByStoreInput')?.checked;
   const updates = {
     name: document.getElementById('storeNameInput').value.trim(),
     slug: document.getElementById('storeSlugInput').value.trim().toLowerCase(),
@@ -912,7 +924,8 @@ document.getElementById('storeSettingsForm').addEventListener('submit', async (e
     min_order_value: parseCurrency(document.getElementById('storeMinOrderInput').value) || 0,
     logo_url: logoUrl,
     cover_url: coverUrl,
-    status: computedStatus
+    status: computedStatus,
+    settings: { ...((currentStore && currentStore.settings) || {}), delivery_fee_by_store: feeByStore }
   };
 
   showLoading(true);
@@ -1941,6 +1954,7 @@ async function renderOrders() {
             <div style="font-weight: 800; font-size: 1.1rem; color: var(--secondary); margin-top: 0.35rem;">
               ${formatCurrency(order.total)}
             </div>
+            ${order.snapshot?.deliveryFeePending ? `<div style="font-size:0.72rem; color:var(--secondary); font-weight:700;">🏪 taxa a combinar</div>` : ''}
           </div>
         </div>
 

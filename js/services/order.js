@@ -10,7 +10,8 @@ const orderService = {
     const items = window.appState.cart.items;
     const orderType = window.appState.cart.orderType;
     const subtotal = window.appState.getSubtotal();
-    const deliveryFee = window.appState.getDeliveryFee();
+    const feePending = orderType === 'delivery' && window.appState.isDeliveryFeeByStore && window.appState.isDeliveryFeeByStore();
+    const deliveryFee = feePending ? 0 : window.appState.getDeliveryFee();
     const total = window.appState.getTotal();
 
     const orderNumber = null;
@@ -71,6 +72,7 @@ const orderService = {
       items: itemsSnapshot,
       subtotal,
       deliveryFee,
+      deliveryFeePending: !!feePending,
       total,
       notes: (notes || '').trim(),
       status: 'enviado_whatsapp',

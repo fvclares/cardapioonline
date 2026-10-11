@@ -57,6 +57,8 @@ function setupCartDrawer(onProceedToCheckout) {
     const minOrder = Number(store.min_order_value || 0);
     const neighborhoods = (store.neighborhoods && store.neighborhoods.length ? store.neighborhoods : (window.storage?.getNeighborhoods?.() || []));
     const hasMultipleNeighborhoods = neighborhoods.length > 1;
+    const feeByStore = window.appState.isDeliveryFeeByStore ? window.appState.isDeliveryFeeByStore() : false;
+    const totalNote = window.appState.getTotalNote ? window.appState.getTotalNote() : '';
 
     const isBelowMin = subtotal < minOrder;
     const fractionalCheck = window.appState.validateFractionalCart ? window.appState.validateFractionalCart() : { valid:true, errors:[] };
@@ -147,7 +149,7 @@ function setupCartDrawer(onProceedToCheckout) {
           `).join('')}
         </div>
 
-        ${orderType === 'delivery' && hasMultipleNeighborhoods ? `
+        ${orderType === 'delivery' && hasMultipleNeighborhoods && !feeByStore ? `
           <div class="form-group" style="margin-bottom: 1.25rem;">
             <label class="form-label">📍 Selecione seu Bairro para a Taxa de Entrega:</label>
             <select id="cartNeighborhoodSelect">
@@ -192,21 +194,29 @@ function setupCartDrawer(onProceedToCheckout) {
             <span>Subtotal dos Itens:</span>
             <span>${cs ? cs.formatCurrency(subtotal) : 'R$ ' + subtotal}</span>
           </div>
-          ${orderType === 'delivery' ? `
+          ${orderType === 'delivery' ? (feeByStore ? `
+            <div class="order-total-row">
+              <span>Taxa de Entrega:</span>
+              <span style="color: var(--secondary); font-weight: 700;">🏪 A ser informada pela loja</span>
+            </div>
+          ` : `
             <div class="order-total-row">
               <span>Taxa de Entrega${hasMultipleNeighborhoods && window.appState.cart.neighborhood?.name ? ` (${window.appState.cart.neighborhood.name})` : ''}:</span>
               <span>${cs ? cs.formatCurrency(deliveryFee) : 'R$ ' + deliveryFee}</span>
             </div>
-          ` : `
+          `) : `
             <div class="order-total-row">
               <span>Taxa de Entrega:</span>
               <span style="color: var(--status-open); font-weight: 700;">Grátis (Retirada)</span>
             </div>
           `}
           <div class="order-total-row final">
-            <span>Total:</span>
+            <span>Total${totalNote ? ' (parcial)' : ''}:</span>
             <span class="total-value">${cs ? cs.formatCurrency(total) : 'R$ ' + total}</span>
           </div>
+          ${totalNote ? `
+            <div style="font-size:0.78rem; color:var(--text-muted); text-align:center; margin-top:0.3rem;">${totalNote}</div>
+          ` : ''}
         </div>
 
         ${isBelowMin ? `

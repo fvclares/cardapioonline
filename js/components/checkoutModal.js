@@ -25,6 +25,7 @@ function setupCheckoutModal() {
     const profile = cs ? cs.getProfile() : {};
     const isDelivery = window.appState.cart.orderType === 'delivery';
     const total = window.appState.getTotal();
+    const totalNote = window.appState.getTotalNote ? window.appState.getTotalNote() : '';
     const savedAddresses = profile.addresses || [];
     const defaultAddr = savedAddresses.find(a => a.id === profile.default_address_id) || savedAddresses[0] || null;
 
@@ -131,6 +132,7 @@ function setupCheckoutModal() {
           <span>🚀 Enviar Pedido pelo WhatsApp</span>
           <span>(${cs ? cs.formatCurrency(total) : 'R$ ' + total})</span>
         </button>
+        ${totalNote ? `<p style="font-size:0.78rem; color:var(--text-muted); text-align:center; margin-top:0.4rem;">${totalNote}</p>` : ''}
       </div>
     `);
 
@@ -303,6 +305,7 @@ function setupCheckoutModal() {
             <span>Pedido ${order.orderNumber}</span>
             <span style="color: var(--secondary);">${cs ? cs.formatCurrency(order.total) : 'R$ ' + order.total}</span>
           </div>
+          ${order.deliveryFeePending ? `<div style="font-size:0.8rem; color:var(--secondary); font-weight:700; margin-bottom:0.5rem;">🏪 Taxa de entrega a ser informada pela loja</div>` : ''}
           <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
             ${order.items.length} ${order.items.length === 1 ? 'item' : 'itens'} • ${order.orderType === 'delivery' ? 'Entrega em ' + (order.deliveryAddress?.neighborhood || '') : 'Retirada no Balcão'}
           </div>
