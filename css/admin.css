@@ -382,3 +382,19 @@
 .sidebar-subscription--warning { color: #ffe08a; background: #443517; }
 .sidebar-subscription--danger { color: #ffb4b4; background: #491f27; }
 .sidebar-subscription--neutral { color: var(--text-muted); background: var(--bg-input); }
+
+/* Planilha de produtos (edição rápida) */
+.sheet-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-md); }
+.sheet-wrap .admin-table { min-width: 900px; }
+.sheet-wrap .admin-table th { white-space: nowrap; position: sticky; top: 0; background: var(--bg-card); z-index: 1; }
+.sheet-wrap .admin-table td { vertical-align: middle; }
+.sheet-cell-name { min-width: 180px; width: 100%; }
+.sheet-cell-price { width: 105px; text-align: right; }
+.sheet-cell-code { width: 70px; text-align: right; }
+.sheet-cell-cat { min-width: 140px; }
+.sheet-cell-mode { min-width: 150px; }
+.sheet-fixed-sub { display: block; font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.15rem; }
+tr.sheet-dirty td { background: rgba(255, 184, 0, 0.07); }
+tr.sheet-dirty td:first-child { border-left: 3px solid var(--primary); }
+tr.sheet-saving { opacity: 0.6; pointer-events: none; }
+.sheet-row-error { color: var(--status-closed); font-size: 0.72rem; display: block; margin-top: 0.15rem; }

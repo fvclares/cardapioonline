@@ -1552,6 +1552,269 @@ async function deleteProduct(prodId) {
 }
 
 // ============================================
+// PLANILHA (edição rápida em tabela)
+// ============================================
+
+function sheetNormMode(v){
+  if(v==='proportional'||v==='proporcional') return 'average';
+  if(v==='average'||v==='fixed'||v==='max') return v;
+  return 'max';
+}
+
+function sheetEsc(v){
+  return String(v ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
+
+function sheetRowHtml(p, cats, sizes, priceOf){
+  const isPizza = !!p.is_pizza;
+  const mode = sheetNormMode(p.fraction_pricing_mode);
+  const catOptions = (cats||[]).map(c=>`<option value="${c.id}"${c.id===p.category_id?' selected':''}>${c.name}</option>`).join('');
+  const sizeCells = (sizes||[]).map(s=>{
+    if(!isPizza) return `<td style="color:var(--text-muted); text-align:center;">—</td>`;
+    const row = priceOf(p.id, s.id);
+    const priceVal = row?.price !== undefined && row?.price !== null ? formatCurrencyInput(row.price) : '';
+    const fixedVal = row?.fraction_fixed_price != null ? formatCurrencyInput(row.fraction_fixed_price) : '';
+    return `<td>
+      <input class="sheet-cell-price" data-size-id="${s.id}" data-active="${s.is_active}" value="${priceVal}" placeholder="—" inputmode="decimal" />
+      <div class="prod-fixed-wrap" data-fixed-wrap="${s.id}" style="display:${mode==='fixed'?'block':'none'}; margin-top:0.25rem;">
+        <span class="sheet-fixed-sub">🏷️ Fixo</span>
+        <input class="sheet-cell-price" data-fixed-for="${s.id}" value="${fixedVal}" placeholder="0,00" inputmode="decimal" />
+      </div>
+    </td>`;
+  }).join('');
+  const baseCell = isPizza
+    ? `<td style="color:var(--text-muted);" data-base-min>${formatCurrency(p.base_price ?? 0)}</td>`
+    : `<td><input class="sheet-cell-price" data-f="base_price" value="${formatCurrencyInput(p.base_price ?? 0)}" inputmode="decimal" /></td>`;
+  const modeCell = isPizza
+    ? `<td><select class="sheet-cell-mode" data-f="fraction_mode">
+        <option value="max"${mode==='max'?' selected':''}>💎 Mais cara</option>
+        <option value="average"${mode==='average'?' selected':''}>⚖️ Média</option>
+        <option value="fixed"${mode==='fixed'?' selected':''}>🏷️ Fixo/tam</option>
+      </select></td>`
+    : `<td style="color:var(--text-muted); text-align:center;">—</td>`;
+  return `<tr data-prod-id="${p.id}" data-is-pizza="${isPizza?1:0}">
+    <td><input class="sheet-cell-code" data-f="codigo" type="number" min="1" max="999" value="${p.codigo ?? ''}" /></td>
+    <td><input class="sheet-cell-name" data-f="name" value="${sheetEsc(p.name)}" />${p.is_featured?'<div style="font-size:0.7rem;">⭐ carrossel</div>':''}</td>
+    <td><select class="sheet-cell-cat" data-f="category_id">${catOptions}</select></td>
+    ${baseCell}
+    ${sizeCells}
+    ${modeCell}
+    <td style="text-align:center;"><input type="checkbox" data-f="available"${p.available!==false?' checked':''} style="width:auto;" title="Disponível" /></td>
+    <td><div class="table-actions" style="flex-wrap:nowrap;">
+      <button class="btn btn-primary btn-sm" data-save="${p.id}" title="Salvar linha">💾</button>
+      <button class="btn btn-secondary btn-sm" data-edit="${p.id}" title="Abrir no modal">✏️</button>
+    </div></td>
+  </tr>`;
+}
+
+function updateSheetDirty(){
+  const n = document.querySelectorAll('#spreadsheetContainer tr.sheet-dirty').length;
+  const countEl = document.getElementById('sheetDirtyCount');
+  if(countEl) countEl.textContent = String(n);
+  const btn = document.getElementById('btnSaveAllSheet');
+  if(btn) btn.disabled = n===0;
+}
+
+async function renderSpreadsheet(){
+  const container = document.getElementById('spreadsheetContainer');
+  if(!container || !currentStoreId) return;
+  const filterEl = document.getElementById('sheetFilterCategory');
+  const searchEl = document.getElementById('sheetFilterSearch');
+  const prevFilter = filterEl?.value || '';
+  const searchQuery = (searchEl?.value || '').trim().toLowerCase();
+
+  const [catRes, prodRes, sizeRes, priceRes] = await Promise.all([
+    categoriesApi.list(currentStoreId).catch(()=>({data:null})),
+    productsApi.listAdmin(currentStoreId),
+    pizzaSizesApi.listAll(currentStoreId).catch(()=>({data:[]})),
+    productSizePricesApi.listByStore(currentStoreId).catch(()=>({data:[]})),
+  ]);
+  const cats = catRes?.data || [];
+  if(prodRes.error){
+    container.innerHTML = window.safeHTML(`<p style="color: var(--status-closed);">Erro: ${prodRes.error.message}</p>`);
+    return;
+  }
+  if(filterEl){
+    filterEl.innerHTML = window.safeHTML(`<option value="">Todas as Categorias</option>` + cats.map(c=>`<option value="${c.id}">${c.name}</option>`).join(''));
+    if(prevFilter && cats.some(c=>c.id===prevFilter)) filterEl.value = prevFilter;
+  }
+  const selectedCat = filterEl?.value || '';
+  const sizes = sizeRes?.data || [];
+  const allPrices = priceRes?.data || [];
+  const priceOf = (pid,sid)=> allPrices.find(v=>v.product_id===pid && v.size_id===sid);
+  const catNameOf = (p)=> p.categories?.name || cats.find(c=>c.id===p.category_id)?.name || '';
+
+  let filtered = (prodRes.data||[]).slice().sort((a,b)=> (a.codigo||9999)-(b.codigo||9999) || (a.display_order||0)-(b.display_order||0));
+  if(selectedCat) filtered = filtered.filter(p=>p.category_id===selectedCat);
+  if(searchQuery) filtered = filtered.filter(p=> (p.name||'').toLowerCase().includes(searchQuery) || String(p.codigo||'').includes(searchQuery) || (catNameOf(p).toLowerCase().includes(searchQuery)));
+
+  if(!filtered.length){
+    container.innerHTML = window.safeHTML(`<p style="color: var(--text-muted); text-align: center; padding: 2rem;">Nenhum produto encontrado.</p>`);
+    updateSheetDirty();
+    return;
+  }
+
+  container.innerHTML = window.safeHTML(`
+  <table class="admin-table">
+    <thead><tr>
+      <th>Cód</th><th>Produto</th><th>Categoria</th><th>Preço${sizes.length?' base':''}</th>
+      ${sizes.map(s=>`<th>${s.name}${s.is_active?'':' (inativo)'}</th>`).join('')}
+      <th>Dividida</th><th>Ativo</th><th></th>
+    </tr></thead>
+    <tbody>${filtered.map(p=>sheetRowHtml(p, cats, sizes, priceOf)).join('')}</tbody>
+  </table>`);
+
+  container.querySelectorAll('input[data-f], input[data-size-id], input[data-fixed-for], select[data-f]').forEach(el=>{
+    el.addEventListener('input', ()=> sheetMarkDirty(el));
+    el.addEventListener('change', ()=> sheetMarkDirty(el));
+  });
+  container.querySelectorAll('select[data-f="fraction_mode"]').forEach(sel=>{
+    sel.addEventListener('change', ()=>{
+      const tr = sel.closest('tr');
+      const show = sel.value==='fixed';
+      tr?.querySelectorAll('.prod-fixed-wrap').forEach(w=>{ w.style.display = show ? 'block' : 'none'; });
+    });
+  });
+  container.querySelectorAll('[data-save]').forEach(btn=>
+    btn.addEventListener('click', ()=> saveSpreadsheetRow(btn.dataset.save)));
+  container.querySelectorAll('[data-edit]').forEach(btn=>
+    btn.addEventListener('click', ()=> openProductModal(btn.dataset.edit)));
+  updateSheetDirty();
+}
+
+function sheetMarkDirty(el){
+  const tr = el.closest('tr');
+  if(tr && !tr.classList.contains('sheet-dirty')){
+    tr.classList.add('sheet-dirty');
+    updateSheetDirty();
+  }
+}
+
+function sheetCellError(input, msg){
+  if(!input) return;
+  input.setAttribute('aria-invalid','true');
+  const small = document.createElement('small');
+  small.className = 'sheet-row-error';
+  small.textContent = msg;
+  input.after(small);
+}
+
+async function saveSpreadsheetRow(prodId){
+  const tr = document.querySelector(`#spreadsheetContainer tr[data-prod-id="${prodId}"]`);
+  if(!tr) return false;
+  const isPizza = tr.dataset.isPizza==='1';
+  tr.querySelectorAll('.sheet-row-error').forEach(e=>e.remove());
+  tr.querySelectorAll('[aria-invalid]').forEach(e=>e.removeAttribute('aria-invalid'));
+
+  const codigo = Number(tr.querySelector('[data-f="codigo"]')?.value);
+  const name = (tr.querySelector('[data-f="name"]')?.value || '').trim();
+  const category_id = tr.querySelector('[data-f="category_id"]')?.value || null;
+  if(!name){ sheetCellError(tr.querySelector('[data-f="name"]'), 'Nome obrigatório'); showToast('Informe o nome do produto', 'error'); return false; }
+  if(!(codigo>=1 && codigo<=999)){ sheetCellError(tr.querySelector('[data-f="codigo"]'), 'Código 1-999'); showToast('Código deve ser entre 1 e 999', 'error'); return false; }
+  if(!category_id){ showToast('Escolha a categoria', 'error'); return false; }
+  const available = tr.querySelector('[data-f="available"]')?.checked !== false;
+  const fracMode = isPizza ? sheetNormMode(tr.querySelector('[data-f="fraction_mode"]')?.value) : 'max';
+
+  const { data: allProds } = await productsApi.listAdmin(currentStoreId);
+  const dup = (allProds||[]).find(p=>Number(p.codigo)===codigo && p.id!==prodId);
+  if(dup){ sheetCellError(tr.querySelector('[data-f="codigo"]'), `Já usado em "${dup.name}"`); showToast(`Código ${codigo} já usado em "${dup.name}"`, 'error'); return false; }
+  const orig = (allProds||[]).find(p=>p.id===prodId) || {};
+
+  let prices = [];
+  let basePriceVal = 0;
+  if(isPizza){
+    const fields = [...tr.querySelectorAll('input[data-size-id]')];
+    const fixedBy = {};
+    tr.querySelectorAll('input[data-fixed-for]').forEach(i=>{ fixedBy[i.dataset.fixedFor]=i.value; });
+    const v = validateProductPrices(isPizza, available, fields.map(f=>({id:f.dataset.sizeId, active:f.dataset.active==='true', value:f.value, fixed:fixedBy[f.dataset.sizeId]})), {requireFixed: fracMode==='fixed'});
+    fields.forEach(f=>{
+      if(v.errors[f.dataset.sizeId]) sheetCellError(f, v.errors[f.dataset.sizeId]);
+      const fin = tr.querySelector(`input[data-fixed-for="${f.dataset.sizeId}"]`);
+      if(fin && v.errors['fixed-'+f.dataset.sizeId]) sheetCellError(fin, v.errors['fixed-'+f.dataset.sizeId]);
+    });
+    if(v.errors._sizes) showToast(v.errors._sizes, 'error');
+    if(Object.keys(v.errors).length) return false;
+    prices = v.prices;
+  } else {
+    basePriceVal = parseCurrency(tr.querySelector('[data-f="base_price"]')?.value) || 0;
+    if(!(basePriceVal>=0) || basePriceVal>99999999.99){ sheetCellError(tr.querySelector('[data-f="base_price"]'), 'Preço inválido'); return false; }
+  }
+
+  const productData = {
+    codigo, name, category_id,
+    base_price: isPizza ? 0 : basePriceVal,
+    description: orig.description || '',
+    image_url: orig.image_url || '',
+    is_pizza: isPizza,
+    has_crusts: !!orig.has_crusts,
+    has_extras: orig.has_extras !== false,
+    available,
+    is_featured: !!orig.is_featured,
+    featured_order: Number(orig.featured_order) || 1,
+    fraction_pricing_mode: isPizza ? fracMode : 'max',
+    fraction_fixed_price: null
+  };
+
+  showLoading(true);
+  tr.classList.add('sheet-saving');
+  try{
+    const { data: saved, error } = await supabase.rpc('save_product_with_prices',{p_store_id:currentStoreId,p_product_id:prodId,p_product:productData,p_prices:prices});
+    if(error) throw error;
+    const savedId = saved?.id || prodId;
+    try{
+      const { error: fracErr } = await productsApi.update(savedId, { fraction_pricing_mode: fracMode });
+      if(fracErr && /fraction/i.test(fracErr.message||'')){
+        showToast('⚠️ Salvo sem regra da dividida — rode a migration product_fraction_pricing', 'info');
+      } else if(!fracErr && isPizza && fracMode==='fixed'){
+        const rows = prices.map(p=>({ product_id: savedId, size_id: p.size_id, price: p.price, fraction_fixed_price: p.fraction_fixed_price }));
+        const { error: fixedErr } = await supabase.from('product_size_prices').upsert(rows, { onConflict: 'product_id,size_id' });
+        if(fixedErr && /fraction_fixed/i.test(fixedErr.message||'')){
+          showToast('⚠️ Salvo sem fixo por tamanho — rode a migration product_size_fraction_fixed', 'info');
+        } else if(fixedErr) throw fixedErr;
+      }
+    }catch(fracEx){
+      console.warn('Fallback precificação fracionada falhou', fracEx?.message);
+    }
+    if(isPizza && saved){
+      const baseCell = tr.querySelector('[data-base-min]');
+      if(baseCell) baseCell.textContent = formatCurrency(saved.base_price ?? 0);
+    }
+    tr.classList.remove('sheet-dirty');
+    updateSheetDirty();
+    showToast(`✅ #${String(codigo).padStart(3,'0')} ${name} salvo!`, 'success');
+    return true;
+  }catch(e){
+    showToast('Não foi possível salvar: ' + (e?.message || e), 'error');
+    return false;
+  }finally{
+    showLoading(false);
+    tr.classList.remove('sheet-saving');
+  }
+}
+
+async function saveAllSpreadsheet(){
+  const rows = [...document.querySelectorAll('#spreadsheetContainer tr.sheet-dirty')];
+  if(!rows.length) return;
+  showLoading(true);
+  let ok = 0;
+  try{
+    for(const tr of rows){
+      const id = tr.dataset.prodId;
+      // eslint-disable-next-line no-await-in-loop
+      if(await saveSpreadsheetRow(id)) ok++;
+    }
+    showToast(ok===rows.length ? `✅ ${ok} produto(s) salvos!` : `⚠️ ${ok}/${rows.length} salvos — revise os erros`, ok===rows.length?'success':'info');
+  }finally{
+    showLoading(false);
+    await renderSpreadsheet();
+  }
+}
+
+document.getElementById('sheetFilterCategory')?.addEventListener('change', renderSpreadsheet);
+document.getElementById('sheetFilterSearch')?.addEventListener('input', renderSpreadsheet);
+document.getElementById('btnSaveAllSheet')?.addEventListener('click', saveAllSpreadsheet);
+
+// ============================================
 // PEDIDOS
 // ============================================
 
@@ -1818,6 +2081,7 @@ const tabTitles = {
   'tab-settings': 'Configurações da Loja',
   'tab-categories': 'Gestão de Categorias',
   'tab-products': 'Catálogo de Produtos & Preços',
+  'tab-spreadsheet': 'Planilha de Produtos',
   'tab-orders': 'Pedidos Recebidos',
   'tab-sizes': 'Tamanhos de Pizza',
   'tab-addons': 'Bordas & Extras',
@@ -1845,6 +2109,7 @@ navItems.forEach(item => {
 
     if (tabId === 'tab-categories') renderCategories();
     if (tabId === 'tab-products') { updateCategoryDropdowns().finally(() => renderProducts()); }
+    if (tabId === 'tab-spreadsheet') renderSpreadsheet();
     if (tabId === 'tab-orders') renderOrders();
     if (tabId === 'tab-sizes') renderPizzaSizes();
     if (tabId === 'tab-addons') renderAddons();

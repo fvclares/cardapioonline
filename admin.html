@@ -167,6 +167,10 @@
           <span class="admin-nav-icon">🍕</span>
           <span>Produtos & Preços</span>
         </button>
+        <button class="admin-nav-item" data-tab="tab-spreadsheet">
+          <span class="admin-nav-icon">📊</span>
+          <span>Planilha</span>
+        </button>
         <button class="admin-nav-item" data-tab="tab-orders">
           <span class="admin-nav-icon">📋</span>
           <span>Pedidos</span>
@@ -354,6 +358,34 @@
             </div>
 
             <div id="productsListContainer"></div>
+          </div>
+        </div>
+
+        <!-- TAB: Planilha (edição rápida) -->
+        <div class="tab-panel" id="tab-spreadsheet">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h2 class="admin-card-title">📊 Planilha de Produtos</h2>
+              <button class="btn btn-primary btn-sm" id="btnSaveAllSheet" disabled>
+                💾 Salvar tudo (<span id="sheetDirtyCount">0</span>)
+              </button>
+            </div>
+
+            <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.88rem;">
+              Edite direto nas células — linhas alteradas ficam <strong style="color:var(--primary);">destacadas</strong>.
+              Salve por linha (💾) ou tudo de uma vez. Criar produto, foto e bordas continuam no modal (✏️).
+            </p>
+
+            <div style="margin-bottom: 1rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+              <select id="sheetFilterCategory" style="max-width: 250px;">
+                <option value="">Todas as Categorias</option>
+              </select>
+              <input type="text" id="sheetFilterSearch" placeholder="Buscar produto por nome..." style="max-width: 320px;" />
+            </div>
+
+            <div class="sheet-wrap">
+              <div id="spreadsheetContainer"></div>
+            </div>
           </div>
         </div>
 
