@@ -1486,7 +1486,16 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
     }
   }
   // Se pizza e tem tamanhos, base_price será o menor preço por tamanho (fallback)
-  // Fixo da dividida agora é por tamanho (vai em p_prices); nível do produto fica nulo.
+  // Fixo da dividida é por tamanho (vai em p_prices). No nível do produto enviamos
+  // o MAIOR dos fixos: a RPC da migration1 exige esse campo no modo fixed, e o
+  // backend o usa como fallback quando o fixo por tamanho ainda não existe.
+  let fixedVals = (validation.prices||[]).map(p=>p.fraction_fixed_price).filter(v=>v>0);
+  let effFracMode = fracMode;
+  if(isPizza && fracMode==='fixed' && !fixedVals.length){
+    // sem nenhum tamanho com preço, não há o que fixar — cai para mais cara
+    effFracMode = 'max';
+    fixedVals = [];
+  }
   const productData = {
     codigo: codigoVal,
     name: document.getElementById('prodNameInput').value.trim(),
@@ -1500,8 +1509,8 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
     available: document.getElementById('prodAvailableInput').checked,
     is_featured: wantFeatured,
     featured_order: Number(document.getElementById('prodFeaturedOrderInput').value) || 1,
-    fraction_pricing_mode: isPizza ? fracMode : 'max',
-    fraction_fixed_price: null
+    fraction_pricing_mode: isPizza ? effFracMode : 'max',
+    fraction_fixed_price: isPizza && effFracMode==='fixed' && fixedVals.length ? Math.max(...fixedVals) : null
   };
 
   showLoading(true);
@@ -1512,12 +1521,13 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
     const savedId = saved?.id || id || null;
     if(savedId && isPizza){
       try {
-        const { error: fracErr } = await productsApi.update(savedId, { fraction_pricing_mode: fracMode });
-        if(fracErr && /fraction/i.test(fracErr.message||'')){
+        const { error: fracErr } = await productsApi.update(savedId, { fraction_pricing_mode: effFracMode });
+        const noFracCol = fracErr && /fraction/i.test(fracErr.message||'');
+        if(noFracCol){
           console.warn('Coluna de precificação fracionada ainda não existe:', fracErr.message);
           showToast('⚠️ Produto salvo, mas sem regra da dividida — rode a migration product_fraction_pricing no Supabase', 'info');
-        } else if(!fracErr && fracMode==='fixed'){
-          // RPC antigo ignora fraction_fixed_price por tamanho — tenta gravar direto
+        } else if(effFracMode==='fixed'){
+          // RPC sem suporte a fixo por tamanho ignora os valores — tenta gravar direto
           const rows = validation.prices.map(p=>({ product_id: savedId, size_id: p.size_id, price: p.price, fraction_fixed_price: p.fraction_fixed_price }));
           const { error: fixedErr } = await supabase.from('product_size_prices').upsert(rows, { onConflict: 'product_id,size_id' });
           if(fixedErr && /fraction_fixed/i.test(fixedErr.message||'')){
@@ -1740,6 +1750,12 @@ async function saveSpreadsheetRow(prodId){
     if(!(basePriceVal>=0) || basePriceVal>99999999.99){ sheetCellError(tr.querySelector('[data-f="base_price"]'), 'Preço inválido'); return false; }
   }
 
+  let sheetFixedVals = (prices||[]).map(p=>p.fraction_fixed_price).filter(v=>v>0);
+  let sheetFracMode = fracMode;
+  if(isPizza && fracMode==='fixed' && !sheetFixedVals.length){
+    sheetFracMode = 'max';
+    sheetFixedVals = [];
+  }
   const productData = {
     codigo, name, category_id,
     base_price: isPizza ? 0 : basePriceVal,
@@ -1751,8 +1767,8 @@ async function saveSpreadsheetRow(prodId){
     available,
     is_featured: !!orig.is_featured,
     featured_order: Number(orig.featured_order) || 1,
-    fraction_pricing_mode: isPizza ? fracMode : 'max',
-    fraction_fixed_price: null
+    fraction_pricing_mode: isPizza ? sheetFracMode : 'max',
+    fraction_fixed_price: isPizza && sheetFracMode==='fixed' && sheetFixedVals.length ? Math.max(...sheetFixedVals) : null
   };
 
   showLoading(true);
@@ -1762,10 +1778,11 @@ async function saveSpreadsheetRow(prodId){
     if(error) throw error;
     const savedId = saved?.id || prodId;
     try{
-      const { error: fracErr } = await productsApi.update(savedId, { fraction_pricing_mode: fracMode });
-      if(fracErr && /fraction/i.test(fracErr.message||'')){
+      const { error: fracErr } = await productsApi.update(savedId, { fraction_pricing_mode: sheetFracMode });
+      const noFracCol = fracErr && /fraction/i.test(fracErr.message||'');
+      if(noFracCol){
         showToast('⚠️ Salvo sem regra da dividida — rode a migration product_fraction_pricing', 'info');
-      } else if(!fracErr && isPizza && fracMode==='fixed'){
+      } else if(isPizza && sheetFracMode==='fixed'){
         const rows = prices.map(p=>({ product_id: savedId, size_id: p.size_id, price: p.price, fraction_fixed_price: p.fraction_fixed_price }));
         const { error: fixedErr } = await supabase.from('product_size_prices').upsert(rows, { onConflict: 'product_id,size_id' });
         if(fixedErr && /fraction_fixed/i.test(fixedErr.message||'')){

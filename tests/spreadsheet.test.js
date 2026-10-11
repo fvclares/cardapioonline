@@ -76,6 +76,19 @@ test('modo fixed sem fixo bloqueia salvamento',async()=>{
   assert.match(err.textContent,/fixo/);
  }finally{h.dom.window.close();}
 });
+test('modo fixed envia fixo por tamanho e max no nível do produto',async()=>{
+ const h=await harness();try{
+  await h.w.renderSpreadsheet();
+  const ok=await h.w.saveSpreadsheetRow('p1');
+  assert.equal(ok,true);
+  assert.equal(h.calls[0].p.p_product.fraction_pricing_mode,'fixed');
+  assert.equal(h.calls[0].p.p_product.fraction_fixed_price,55);
+  assert.deepEqual(h.calls[0].p.p_prices,[
+   {size_id:'g',price:65,fraction_fixed_price:50},
+   {size_id:'m',price:70,fraction_fixed_price:55},
+  ]);
+ }finally{h.dom.window.close();}
+});
 test('filtro por categoria reduz as linhas',async()=>{
  const h=await harness();try{
   await h.w.renderSpreadsheet();
