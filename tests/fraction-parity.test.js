@@ -81,6 +81,41 @@ test('extra em uma metade',()=>check([{pid:'b',den:2,extras:true},{pid:'d',den:2
 test('duas pizzas completas (4 meias)',()=>check([{pid:'a',den:2},{pid:'b',den:2},{pid:'c',den:2},{pid:'d',den:2}],'g'));
 test('preço quebrado 77.33',()=>check([{pid:'d',den:2},{pid:'b',den:2}],'f'));
 test('fixo quebrado 62.5',()=>check([{pid:'a',den:2},{pid:'d',den:2}],'f'));
+// fluxo combinado legado (pizza inteira multi-sabor, fractionValue 1)
+function checkCombined(pids,sizeId){
+ const {dom,w}=setup();try{
+  const size=SIZES.find(s=>s.id===sizeId);
+  const [first,...rest]=pids;
+  w.appState.addItem({product:{...PRODS.find(p=>p.id===first)},size:{...size},quantity:1,
+   crust:null,extras:[],observation:'',_allFlavors:rest.map(id=>({...PRODS.find(p=>p.id===id)}))});
+  const client=w.appState.getSubtotal();
+  const server=priceOrder({items:[{productId:first,size:{id:sizeId},flavorIds:rest,quantity:1}],orderType:'pickup',
+   customer:{name:'Teste',phone:'85999999999'},payment:{method:'pix'},total:0},
+   {store:{id:'s',name:'L',phone:'1',default_delivery_fee:0,min_order_value:0},settings:{},
+    products:PRODS,sizes:SIZES,prices:PRICES,addons:ADDONS,offers:[],neighborhoods:[]});
+  const diff=Math.abs(client-server.subtotal);
+  assert.ok(diff<=0.001,'diff '+diff.toFixed(4)+' client='+client+' server='+server.subtotal);
+ }finally{dom.window.close();}
+}
+test('combinada max (68)',()=>checkCombined(['b','a'],'g'));
+test('combinada average quebrada (83.67)',()=>checkCombined(['d','b'],'f'));
+test('combinada fixa (50 + 34 = 84)',()=>checkCombined(['a','b'],'g'));
+test('combinada fixa terços',()=>checkCombined(['a','b','c'],'t'));
+test('combo preserva preço do catálogo',()=>{
+ const {dom,w}=setup();try{
+  const offer={id:'combo',name:'Combo',price:70};
+  const groups=[{groupId:'group',groupName:'Pizza',quantity:1,items:[{product_id:'a',name:'Pizza A',extra_price:2}]}];
+  w.appState.addOffer({offer,groups,total:72});
+  const client=w.appState.getSubtotal();
+  const server=priceOrder({items:[{isOffer:true,offerId:'combo',quantity:1,offerGroups:[{groupId:'group',items:[{product_id:'a'}]}]}],
+   orderType:'pickup',customer:{name:'Teste',phone:'85999999999'},payment:{method:'pix'},total:0},
+   {store:{id:'s',name:'L',phone:'1',default_delivery_fee:0,min_order_value:0},settings:{},
+    products:PRODS,sizes:SIZES,prices:PRICES,addons:ADDONS,
+    offers:[{id:'combo',name:'Combo',active:true,price:70,max_per_order:2,groups:[{id:'group',name:'Pizza',quantity:1,offer_group_items:[{product_id:'a',extra_price:2}]}]}],
+    neighborhoods:[]});
+  assert.ok(Math.abs(client-server.subtotal)<=0.001,'client='+client+' server='+server.subtotal);
+ }finally{dom.window.close();}
+});
 // varredura pseudo-aleatória com seed fixa
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 test('sweep aleatório (200 casos)',()=>{

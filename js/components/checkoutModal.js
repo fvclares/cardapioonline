@@ -285,7 +285,19 @@ function setupCheckoutModal() {
 
     closeCheckout();
     openSuccessModal(orderSnapshot);
-    }catch(error){if(pendingWindow) pendingWindow.close();alert(error.message || 'Pedido não registrado. Tente novamente.');}
+    }catch(error){
+      if(pendingWindow) pendingWindow.close();
+      const msg = error.message || 'Pedido não registrado. Tente novamente.';
+      if(/preços mudaram/i.test(msg) && window.appState.refreshCartPrices){
+        try{
+          const n = await window.appState.refreshCartPrices();
+          const newTotal = window.appState.getTotal();
+          const spans = submit.querySelectorAll('span');
+          if(spans[1]) spans[1].textContent = `(${(cs&&cs.formatCurrency)?cs.formatCurrency(newTotal):'R$ '+newTotal})`;
+          alert(`Os preços mudaram. Atualizei a sacola com os valores atuais (${n} ${n===1?'item':'itens'}) — confira e toque em Enviar novamente.`);
+        }catch{ alert(msg); }
+      } else alert(msg);
+    }
     finally{submit.disabled=false;}
   }
 

@@ -611,6 +611,83 @@ class StoreState {
     this.notify();
   }
 
+  // Preço atual de um adicional no catálogo recarregado (null se saiu do cardápio)
+  _freshAddonPrice(kind, id){
+    const groups = this.addonGroups?.[kind==='crust'?'crustGroups':'extraGroups'] || [];
+    for(const g of groups){
+      const o = (g.options||[]).find(o=>o.id===id);
+      if(o) return Number(o.price ?? 0);
+    }
+    return null;
+  }
+
+  // Recarrega o catálogo e recalcula a sacola com os valores atuais.
+  // Retorna nº de itens atualizados. Usado após 409 (preços mudaram).
+  async refreshCartPrices(){
+    const storageEngine = window.storage;
+    const storeId = this.store?.id || storageEngine?.storeId;
+    if(!storageEngine || !storeId || typeof storageEngine.init!=='function') return 0;
+    await storageEngine.init(storeId);
+    await this.refreshData();
+    // Bairro: mantém seleção, atualiza taxa
+    if(this.cart.neighborhood?.id){
+      const nbs = this.store?.neighborhoods || [];
+      const fresh = nbs.find(n=>n.id===this.cart.neighborhood.id);
+      if(fresh) this.cart.neighborhood = fresh;
+    }
+    const rebuilt = [];
+    let updated = 0;
+    for(const it of this.cart.items){
+      try{
+        if(it.isOffer){
+          const offer = (this.offers||[]).find(o=>o.id===it.offerId);
+          if(!offer) { rebuilt.push(it); continue; }
+          const groups = offer.offer_groups || offer.groups || [];
+          const extraSum = (it.offerGroups||[]).reduce((s,g)=>s+(g.items||[]).reduce((s2,x)=>{
+            const grp = groups.find(gg=>gg.id===g.groupId);
+            const opt = (grp?.offer_group_items||[]).find(i=>i.product_id===x.product_id);
+            return s2 + Number(opt ? opt.extra_price||0 : x.extra_price||0);
+          },0),0);
+          const unit = this._reais(this._cents(Number(offer.price||0)+extraSum));
+          rebuilt.push({...it, basePrice:unit, unitPrice:unit, offerPrice:Number(offer.price||0),
+            itemTotal:this._reais(this._cents(unit)*Number(it.quantity||1))});
+          updated++; continue;
+        }
+        const prod = (this.products||[]).find(p=>p.id===it.productId);
+        if(!prod){ rebuilt.push(it); continue; }
+        const size = it.size?.id ? ((this.pizzaSizes||[]).find(s=>s.id===it.size.id) || {...it.size}) : null;
+        const flavors = (it.flavorIds||[]).map(fid=>(this.products||[]).find(p=>p.id===fid)).filter(Boolean);
+        if(flavors.length!==(it.flavorIds||[]).length){ rebuilt.push(it); continue; }
+        const crust = it.crust ? {...it.crust} : null;
+        if(crust){ const p = this._freshAddonPrice('crust',crust.id); if(p!=null) crust.price=p; }
+        const extras = (it.extras||[]).map(e=>{
+          const p = this._freshAddonPrice('extra',e.id);
+          const qty = Number(e.quantity||1);
+          const unit = p!=null ? p : Math.round(this._cents(Number(e.price||0))/qty);
+          return {...e, price: this._reais(unit)};
+        });
+        const params = { product:prod, size, quantity:Number(it.quantity||1),
+          crust, extras, observation:it.observation||'' };
+        if(it.fractionValue!=null && it.fractionValue<1){
+          params.fraction = { value:Number(it.fractionValue),
+            numerator:it.fraction?.numerator||1, denominator:it.fraction?.denominator||2,
+            label:it.fractionLabel||it.fraction?.label||'½' };
+        } else if(flavors.length){
+          params.secondFlavor = flavors.length===1 ? flavors[0] : null;
+          params._allFlavors = flavors.length>1 ? flavors : null;
+        }
+        this.addItem(params);
+        rebuilt.push(this.cart.items.pop());
+        updated++;
+      }catch{
+        rebuilt.push(it);
+      }
+    }
+    this.cart.items = rebuilt;
+    this.notify();
+    return updated;
+  }
+
   // --- Opções de Entrega e Pagamento ---
   setOrderType(type) {
     this.cart.orderType = type;
