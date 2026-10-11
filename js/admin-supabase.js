@@ -1,5 +1,6 @@
 import {validateProductPrices} from './lib/product-prices.js';
 import {subscriptionSummary} from './lib/subscription-summary.js';
+import {explainSupabaseError} from './lib/supabase-fetch.js';
 /**
  * Admin Panel - Supabase Version
  * Multi-tenant SaaS com autenticação Supabase Auth
@@ -1541,8 +1542,8 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
     }
     closeProductModal();await renderProducts();showToast('✅ Produto e preços salvos!','success');
   } catch(error){
-    document.getElementById('prodSizePricesError').textContent='Não foi possível salvar: '+error.message;
-    showToast('Não foi possível salvar: '+error.message,'error');
+    document.getElementById('prodSizePricesError').textContent='Não foi possível salvar: '+explainSupabaseError(error.message);
+    showToast('Não foi possível salvar: '+explainSupabaseError(error.message),'error');
   } finally {showLoading(false);}
 });
 
@@ -1801,7 +1802,7 @@ async function saveSpreadsheetRow(prodId){
     showToast(`✅ #${String(codigo).padStart(3,'0')} ${name} salvo!`, 'success');
     return true;
   }catch(e){
-    showToast('Não foi possível salvar: ' + (e?.message || e), 'error');
+    showToast('Não foi possível salvar: ' + explainSupabaseError(e?.message || e),'error');
     return false;
   }finally{
     showLoading(false);

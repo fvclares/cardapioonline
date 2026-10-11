@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import {JSDOM} from 'jsdom';
 import {validateProductPrices} from '../js/lib/product-prices.js';
+import {explainSupabaseError} from '../js/lib/supabase-fetch.js';
 const field=(value,active=true,id='g')=>({id,value,active});
 for(const [label,available,fields,valid] of [
  ['available missing',true,[field('')],false],['one size',true,[field('60,00')],true],
@@ -43,7 +44,7 @@ async function adminHarness({failSave=false,failRead=false}={}){
  for(const f of ['js/vendor/purify.min.js','js/lib/safe-html.js'])w.eval(fs.readFileSync(f,'utf8'));
  let handler;const calls=[],messages=[];
  w.document.getElementById('productForm').addEventListener=(name,fn)=>{if(name==='submit')handler=fn;};
- Object.assign(w,{validateProductPrices,currentStoreId:'shop',showLoading:()=>{},showToast:(message,type)=>messages.push({message,type}),closeProductModal:()=>{},renderProducts:async()=>{},formatCurrencyInput:v=>Number(v).toFixed(2).replace('.',','),parseCurrency:v=>Number(String(v).replace(',','.')),
+ Object.assign(w,{validateProductPrices,explainSupabaseError,currentStoreId:'shop',showLoading:()=>{},showToast:(message,type)=>messages.push({message,type}),closeProductModal:()=>{},renderProducts:async()=>{},formatCurrencyInput:v=>Number(v).toFixed(2).replace('.',','),parseCurrency:v=>Number(String(v).replace(',','.')),
  productsApi:{listAdmin:async()=>({data:[]})},pizzaSizesApi:{listAll:async()=>({data:[{id:'g',name:'Grande',is_active:true,slices:8,max_flavors:2},{id:'off',name:'Inativo',is_active:false,slices:6,max_flavors:1}],error:failRead?{message:'offline'}:null})},productSizePricesApi:{listByProduct:async()=>({data:[]})},supabase:{rpc:async(name,payload)=>{calls.push({name,payload});return {error:failSave?{message:'Simulated transaction failure'}:null};}}});
  const src=fs.readFileSync('js/admin-supabase.js','utf8');
  const start=src.indexOf("document.getElementById('productForm').addEventListener('submit'");const end=src.indexOf('\nasync function deleteProduct',start);

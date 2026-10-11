@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import {JSDOM} from 'jsdom';
 import {validateProductPrices} from '../js/lib/product-prices.js';
+import {explainSupabaseError} from '../js/lib/supabase-fetch.js';
 async function harness({prices, onRpc}={}){
  const dom=new JSDOM(fs.readFileSync('admin.html','utf8'),{url:'http://localhost/',runScripts:'outside-only'}),w=dom.window;
  for(const f of ['js/vendor/purify.min.js','js/lib/safe-html.js'])w.eval(fs.readFileSync(f,'utf8'));
@@ -16,7 +17,7 @@ async function harness({prices, onRpc}={}){
   {product_id:'p1',size_id:'m',price:70,fraction_fixed_price:55},
   {product_id:'p2',size_id:'g',price:60,fraction_fixed_price:null},
  ];
- Object.assign(w,{validateProductPrices,currentStoreId:'shop',
+ Object.assign(w,{validateProductPrices,explainSupabaseError,currentStoreId:'shop',
   showLoading:()=>{},showToast:(m,t)=>messages.push({m,t}),renderProducts:async()=>{},
   openProductModal:(id)=>opened.push(id),
   formatCurrencyInput:v=>Number(v).toFixed(2).replace('.',','),formatCurrency:v=>'R$'+Number(v).toFixed(2),
