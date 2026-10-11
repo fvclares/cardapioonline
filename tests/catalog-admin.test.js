@@ -73,7 +73,8 @@ test('actual admin form cannot overwrite catalog after loading failure',async()=
 test('real cart method: ordinary, sized pizza, halves, crusts and extras retain prices',()=>{
  const src=fs.readFileSync('js/state/store.js','utf8');const method=src.slice(src.indexOf('  addItem(itemPayload) {'),src.indexOf('  updateQuantity(itemId, delta) {'));
  const add=new Function('return ({'+method+'}).addItem')();
- const state={pizzaSizes:[{id:'g',is_active:true}],productSizePrices:[{product_id:'p',size_id:'g',price:60},{product_id:'f',size_id:'g',price:80}],cart:{items:[]},notify(){}};
+ const state={pizzaSizes:[{id:'g',is_active:true}],productSizePrices:[{product_id:'p',size_id:'g',price:60},{product_id:'f',size_id:'g',price:80}],cart:{items:[]},notify(){},
+  _cents:v=>Math.round(Number(v)*100),_reais:c=>c/100};
  const pizza={id:'p',name:'Pizza A',price:0,is_pizza:true},flavor={id:'f',name:'Pizza B',price:0,is_pizza:true};
  assert.equal(add.call(state,{product:{id:'d',name:'Drink',price:10},quantity:2}).itemTotal,20);
  assert.equal(add.call(state,{product:pizza,size:{id:'g',name:'Grande'},crust:{id:'c',name:'Borda',price:8},extras:[{id:'e',name:'Extra',price:4}]}).unitPrice,72);
@@ -85,6 +86,7 @@ test('fixed half displays the fixed value, not the proportional half',()=>{
  const src=fs.readFileSync('js/state/store.js','utf8');const method=src.slice(src.indexOf('  addItem(itemPayload) {'),src.indexOf('  updateQuantity(itemId, delta) {'));
  const add=new Function('return ({'+method+'}).addItem')();
  const state={pizzaSizes:[{id:'g',is_active:true}],productSizePrices:[{product_id:'p',size_id:'g',price:65}],cart:{items:[]},notify(){},
+  _cents:v=>Math.round(Number(v)*100),_reais:c=>c/100,
   getProductFractionConfig:()=>({mode:'fixed',fixed:50})};
  const pizza={id:'p',name:'Pizza A',price:0,is_pizza:true};
  const half=add.call(state,{product:pizza,size:{id:'g',name:'Grande'},fraction:{value:0.5,numerator:1,denominator:2,label:'Meia'}});

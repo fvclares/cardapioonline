@@ -126,6 +126,10 @@ class StoreState {
     return 'max';
   }
 
+  // Dinheiro em centavos (inteiro) para paridade exata com o servidor (409 se divergir)
+  _cents(v){ return Math.round(Number(v)*100); }
+  _reais(c){ return c/100; }
+
   getProductFractionConfig(productId, sizeId){
     const p = (this.products||[]).find(x=> x.id===productId) || null;
     let mode = p ? this.normalizeFractionMode(p.fraction_pricing_mode) : null;
@@ -151,12 +155,13 @@ class StoreState {
   // Com parte fixa, a pizza é a SOMA das parcelas: fixa contribui
   // fixo×(fração/0,5) (½=fixo, ¼=metade do fixo); demais, proporcional.
   // Sem fixa: qualquer 'max' vale a mais cara; todas 'average', soma proporcional.
+  // Tudo em centavos inteiros (paridade exata com o servidor).
   // parts: [{price, fractionValue, mode, fixed}]
   priceFractionalPizza(parts){
     if(parts.some(x=> x.mode==='fixed' && x.fixed>0))
-      return parts.reduce((s,x)=> s + (x.mode==='fixed' && x.fixed>0 ? x.fixed * x.fractionValue/0.5 : x.price * x.fractionValue), 0);
-    if(parts.some(x=> x.mode!=='average')) return Math.max(...parts.map(x=> x.price));
-    return parts.reduce((s,x)=> s + x.price * x.fractionValue, 0);
+      return this._reais(parts.reduce((s,x)=> s + (x.mode==='fixed' && x.fixed>0 ? Math.round(this._cents(x.fixed)*x.fractionValue/0.5) : Math.round(this._cents(x.price)*x.fractionValue)), 0));
+    if(parts.some(x=> x.mode!=='average')) return Math.max(...parts.map(x=> this._reais(this._cents(x.price))));
+    return this._reais(parts.reduce((s,x)=> s + Math.round(this._cents(x.price)*x.fractionValue), 0));
   }
 
   // Refresh assíncrono (busca do Supabase)
@@ -345,7 +350,7 @@ class StoreState {
       const base = Number(item.basePrice!=null ? item.basePrice : item.unitPrice);
       const effectivePrice = base + (item.crust?Number(item.crust.price||0):0) + (item.extras?item.extras.reduce((s,e)=>s+Number(e.price||0),0):0);
       if(fv===1){
-        wholeSubtotal += effectivePrice * qty;
+        wholeSubtotal += this._reais(this._cents(effectivePrice) * qty);
       } else {
         const key = item.size?.id || item.size?.name || 'sem-tamanho';
         if(!fractionalBySize[key]) fractionalBySize[key]=[];
@@ -402,8 +407,8 @@ class StoreState {
             : Math.max(...pizza.map(x=> x.price));
           fracSubtotal += priceWhole;
         } else if(pizza.length && sum>0.001){
-          // grupo incompleto: exibe proporcional (validação bloqueia o checkout)
-          fracSubtotal += pizza.reduce((s,e)=> s + e.price * e.fractionValue, 0);
+          // grupo incompleto: exibe proporcional em centavos (validação bloqueia o checkout)
+          fracSubtotal += this._reais(pizza.reduce((s,e)=> s + Math.round(this._cents(e.price)*e.fractionValue), 0));
         }
       }
     }
@@ -450,6 +455,7 @@ class StoreState {
       const fracCfg = (typeof this.getProductFractionConfig==='function')
         ? this.getProductFractionConfig(product.id, size?.id)
         : { mode: 'max', fixed: null };
+      unitPrice = this._reais(this._cents(unitPrice));
       const cartItem = {
         id: 'cart_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
         productId: product.id,
@@ -468,11 +474,11 @@ class StoreState {
         crust: crust ? { id: crust.id, name: crust.name, price: Number(crust.price || 0) } : null,
         extras: extras.map(e => ({ id: e.id, name: e.name, price: Number(e.price || 0)*Number(e.quantity||1), quantity: Number(e.quantity||1), groupId: e.groupId || null })),
         observation: observation.trim(),
-        // Exibição: metade fixa mostra o fixo (fixo×fração/0,5); demais, proporcional.
+        // Exibição em centavos: metade fixa mostra o fixo (fixo×fração/0,5); demais, proporcional.
         // Subtotal real é recalculado via _computeFractionalSubtotal.
         itemTotal: (fracCfg.mode==='fixed' && fracCfg.fixed>0)
-          ? fracCfg.fixed * (fv/0.5) * quantity
-          : unitPrice * quantity * fv
+          ? this._reais(Math.round(this._cents(fracCfg.fixed)*(fv/0.5)) * quantity)
+          : this._reais(Math.round(this._cents(unitPrice)*fv) * quantity)
       };
       // getSubtotal recalcula agrupado; itemTotal acima é só para listagem
       this.cart.items.push(cartItem);
@@ -499,10 +505,10 @@ class StoreState {
       const parts = [product, ...allFlavors].map((p,i)=> ({ cfg: cfgOf(p.id), price: prices[i] }));
       if(parts.some(x=> x.cfg.mode==='fixed' && x.cfg.fixed>0)){
         const share = 1/parts.length;
-        basePrice = parts.reduce((s,x)=> s + (x.cfg.mode==='fixed' && x.cfg.fixed>0 ? x.cfg.fixed*share/0.5 : x.price*share), 0);
+        basePrice = this._reais(parts.reduce((s,x)=> s + (x.cfg.mode==='fixed' && x.cfg.fixed>0 ? Math.round(this._cents(x.cfg.fixed)*share/0.5) : Math.round(this._cents(x.price)*share)), 0));
       }
-      else if(parts.every(x=> x.cfg.mode==='average')) basePrice = prices.reduce((s,v)=> s+v, 0) / prices.length;
-      else basePrice = Math.max(...prices);
+      else if(parts.every(x=> x.cfg.mode==='average')) basePrice = this._reais(Math.round(parts.reduce((s,x)=>s+this._cents(x.price),0)/parts.length));
+      else basePrice = this._reais(Math.max(...parts.map(x=>this._cents(x.price))));
       const names = [product.name, ...allFlavors.map(f=> f.name)];
       // Monta nome com frações
       if (allFlavors.length===1) displayName = `Pizza ½ ${names[0].replace('Pizza ','')} + ½ ${names[1].replace('Pizza ','')}`;
@@ -528,8 +534,9 @@ class StoreState {
         unitPrice += Number(extra.price || 0)*Number(extra.quantity||1);
       });
     }
+    unitPrice = this._reais(this._cents(unitPrice));
 
-    const itemTotal = unitPrice * quantity;
+    const itemTotal = this._reais(this._cents(unitPrice) * quantity);
 
     const cartItem = {
       id: 'cart_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
@@ -570,11 +577,11 @@ class StoreState {
         item.itemTotal = item.unitPrice * item.quantity;
       } else {
         const fv = (item.fractionValue!=null) ? Number(item.fractionValue) : 1;
-        // Exibição: metade fixa mostra o fixo; subtotal real via _computeFractionalSubtotal
+        // Exibição em centavos: metade fixa mostra o fixo; subtotal real via _computeFractionalSubtotal
         const fmode = item.fractionMode || 'max';
         const ffix = item.fractionFixed!=null ? Number(item.fractionFixed) : null;
-        if(fv<1) item.itemTotal = (fmode==='fixed' && ffix>0) ? ffix*(fv/0.5)*item.quantity : item.unitPrice * item.quantity * fv;
-        else item.itemTotal = item.unitPrice * item.quantity;
+        if(fv<1) item.itemTotal = (fmode==='fixed' && ffix>0) ? this._reais(Math.round(this._cents(ffix)*(fv/0.5))*item.quantity) : this._reais(Math.round(this._cents(item.unitPrice)*fv)*item.quantity);
+        else item.itemTotal = this._reais(this._cents(item.unitPrice)*item.quantity);
       }
     }
 
@@ -640,7 +647,7 @@ class StoreState {
       crust: null,
       extras: [],
       fractionValue: 1,
-      itemTotal: unitPrice * quantity
+      itemTotal: this._reais(this._cents(unitPrice) * quantity)
     };
     this.cart.items.push(cartItem);
     this.notify();
@@ -651,8 +658,8 @@ class StoreState {
   getSubtotal() {
     // Se tem frações, usa cálculo agrupado (max por pizza completa)
     const hasFraction = this.cart.items.some(i=> (i.fractionValue!=null && i.fractionValue<1));
-    if(hasFraction) return this._computeFractionalSubtotal();
-    return this.cart.items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+    if(hasFraction) return this._reais(Math.round(this._computeFractionalSubtotal()*100));
+    return this._reais(Math.round(this.cart.items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0)*100));
   }
 
   // Taxa definida pela loja: pedido sem valor de taxa (loja informa depois)
@@ -673,7 +680,7 @@ class StoreState {
 
   getTotal() {
     const fee = this.getDeliveryFee();
-    return this.getSubtotal() + (fee == null ? 0 : fee);
+    return this._reais(Math.round((this.getSubtotal() + (fee == null ? 0 : fee))*100));
   }
 
   // Texto de apoio quando o total é parcial (taxa a combinar com a loja)
